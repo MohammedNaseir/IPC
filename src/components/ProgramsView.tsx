@@ -7,7 +7,6 @@ import {
   Upload,
   Download,
   ChevronRight,
-  Lock,
   Plus,
   ArrowLeft,
   X,
@@ -135,18 +134,6 @@ export const ProgramsView: React.FC<ProgramsViewProps> = ({
           </div>
         )}
       </div>
-
-      {/* Permission indicator for hospital role */}
-      {!isCentral && (
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-sky-800">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-sky-600 shrink-0" />
-            <span>
-              <strong>صلاحية استعراض وتحميل:</strong> تتاح برامج مكافحة العدوى للاطلاع والتحميل لكافة مستشفيات التجمع لتوحيد المسارات الإكلينيكية.
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Breadcrumb Navigation Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">

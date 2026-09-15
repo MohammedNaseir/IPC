@@ -13,6 +13,7 @@ import {
   Database,
   ShieldCheck,
   Building,
+  LogOut,
 } from 'lucide-react';
 import { UserRole } from '../types/ipc';
 
@@ -38,6 +39,7 @@ interface SidebarProps {
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
   isDevAdmin?: boolean;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -50,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   setIsMobileOpen,
   isDevAdmin = false,
+  onLogout,
 }) => {
   const isCentral = userRole === 'central' || isDevAdmin;
 
@@ -275,6 +278,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Sidebar Footer: Logout Button */}
+        {onLogout && (
+          <div className="p-3 border-t border-slate-800/80 bg-[#161622]">
+            <button
+              onClick={() => {
+                if (setIsMobileOpen) setIsMobileOpen(false);
+                onLogout();
+              }}
+              className="w-full flex items-center justify-between p-2.5 rounded-lg bg-rose-950/30 hover:bg-rose-900/40 border border-rose-900/40 text-rose-300 hover:text-rose-100 transition-colors text-right cursor-pointer"
+              title="تسجيل الخروج من النظام"
+            >
+              <div className="flex items-center gap-2">
+                <LogOut className="w-4 h-4 text-rose-400" />
+                <span className="text-xs font-bold">تسجيل الخروج</span>
+              </div>
+              <span className="text-[10px] text-rose-400/80 font-medium">إنهاء الجلسة</span>
+            </button>
+          </div>
+        )}
 
         {/* Sidebar Footer: Neon DB Status Button - STRICTLY DEV ADMIN ONLY */}
         {isDevAdmin && (

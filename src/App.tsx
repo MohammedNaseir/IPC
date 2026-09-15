@@ -27,6 +27,7 @@ import { DocumentsView } from './components/DocumentsView';
 import { ProgramsView } from './components/ProgramsView';
 import { AuditView } from './components/AuditView';
 import { NeonModal } from './components/NeonModal';
+import { LoginView } from './components/LoginView';
 
 export default function App() {
   // Navigation and UI state
@@ -36,7 +37,7 @@ export default function App() {
   const [isNeonConnected, setIsNeonConnected] = useState(false);
 
   // Core Data loaded from neonService
-  const [currentUser, setCurrentUser] = useState<User>(neonService.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<User | null>(() => neonService.getCurrentUser());
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -56,7 +57,8 @@ export default function App() {
 
   // Reload all data from single source of truth
   const reloadData = useCallback(() => {
-    setCurrentUser(neonService.getCurrentUser());
+    const active = neonService.getCurrentUser();
+    setCurrentUser(active);
     setAvailableUsers(neonService.getUsers());
     setHospitals(neonService.getHospitals());
     setVisits(neonService.getVisits());
@@ -92,6 +94,21 @@ export default function App() {
     }
   };
 
+  // Handler: Login With Password (Secure Multi-Tenant Auth)
+  const handleLoginWithPassword = (email: string, pass: string): { success: boolean; user?: User; message?: string } => {
+    const res = neonService.loginWithPassword(email, pass);
+    if (res.success && res.user) {
+      setCurrentUser(res.user);
+      if (res.user.role === 'hospital') {
+        setSelectedHospitalId(res.user.hospitalId || null);
+      } else {
+        setSelectedHospitalId(null);
+      }
+      reloadData();
+    }
+    return res;
+  };
+
   // Handler: Direct Email Login (Handles hidden Dev Admin and Hospital Coordinators)
   const handleLoginWithEmail = (email: string): { success: boolean; user?: User; message?: string } => {
     const res = neonService.loginWithEmail(email);
@@ -107,10 +124,10 @@ export default function App() {
     return res;
   };
 
-  // Handler: Logout
+  // Handler: Logout - Full session termination
   const handleLogout = () => {
-    const defaultUser = neonService.logout();
-    setCurrentUser(defaultUser);
+    neonService.logout();
+    setCurrentUser(null);
     setSelectedHospitalId(null);
   };
 
@@ -465,12 +482,23 @@ export default function App() {
     reloadData();
   };
 
+  // If session is logged out or no user is logged in, show official Login View
+  if (!currentUser) {
+    return (
+      <LoginView
+        onLoginWithPassword={handleLoginWithPassword}
+        hospitals={hospitals}
+      />
+    );
+  }
+
+  const isDevAdmin = neonService.isDevAdmin(currentUser);
   // Find user's hospital name
   const currentHospitalObj = hospitals.find((h) => h.id === currentUser.hospitalId);
 
   return (
-    <div className="min-h-screen bg-[#f5f8fa] text-slate-900 font-sans antialiased selection:bg-teal-500 selection:text-white" dir="rtl">
-      {/* Metronic Sidebar */}
+    <div className="min-h-screen bg-[var(--color-canvas)] text-[var(--color-ink)] font-sans antialiased selection:bg-[#0066cc] selection:text-white" dir="rtl">
+      {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -480,11 +508,13 @@ export default function App() {
         onOpenNeonModal={() => setIsNeonModalOpen(true)}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
+        isDevAdmin={isDevAdmin}
+        onLogout={handleLogout}
       />
 
-      {/* Main Wrapper with proper RTL offset */}
+      {/* Main Wrapper with sidebar offset */}
       <div className="lg:mr-64 flex flex-col min-h-screen transition-all">
-        {/* Metronic Header */}
+        {/* Header */}
         <Header
           currentUser={currentUser}
           onSwitchUser={handleSwitchUser}
@@ -503,7 +533,7 @@ export default function App() {
         />
 
         {/* Main Content Body */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-32">
           {activeTab === 'dashboard' && (
             <DashboardView
               currentUser={currentUser}
@@ -612,8 +642,14 @@ export default function App() {
             <span>•</span>
             <span className="text-[11px] text-teal-700 font-medium">النسخة الرسمية المعتمدة v1.0</span>
           </div>
-          <div className="font-mono text-[11px] text-slate-400">
-            {isNeonConnected ? 'PostgreSQL Neon Active' : 'Offline / Local Ready'}
+          <div className="text-[11px] text-slate-400">
+            {isDevAdmin ? (
+              <span className="font-mono text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                dev: {isNeonConnected ? 'PostgreSQL Neon Active' : 'Local Storage Mode'}
+              </span>
+            ) : (
+              <span className="text-emerald-700 font-medium">المنظومة متصلة ومحدثة</span>
+            )}
           </div>
         </footer>
       </div>

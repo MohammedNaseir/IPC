@@ -7,7 +7,6 @@ import {
   Filter,
   Eye,
   CheckCircle2,
-  Lock,
   Plus,
   Network,
   FileArchive,
@@ -159,18 +158,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           </button>
         )}
       </div>
-
-      {/* Permissions Notice */}
-      {!isCentral && (
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-sky-800">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-sky-600 shrink-0" />
-            <span>
-              <strong>وضع المشاهدة والتحميل:</strong> تم حصر صلاحية الرفع والإدارة بالإدارة المركزية لمكافحة العدوى، ويمكنك كمنسق مستشفى استعراض كافة الملفات وتحميلها مباشرة.
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Filters & Search */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

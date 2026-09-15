@@ -250,24 +250,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 كود: 123456
               </div>
             </button>
-
-            {/* Dev Admin */}
-            <button
-              type="button"
-              onClick={() => handleFillQuick('moha.naseir@gmail.com', 'dev123')}
-              className="p-2 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-lg text-right transition-colors"
-            >
-              <div className="font-bold text-slate-800 text-xs flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-600" />
-                المشرف المطور (dev)
-              </div>
-              <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-                moha.naseir@gmail.com
-              </div>
-              <div className="text-[9px] text-amber-600 font-mono">
-                كود: dev123
-              </div>
-            </button>
           </div>
         </div>
       </div>

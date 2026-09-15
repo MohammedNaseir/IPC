@@ -880,21 +880,6 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
                       <Edit2 className="w-3 h-3" />
                       <span>المستشفى</span>
                     </button>
-
-                    {onSwitchUser && (
-                      <button
-                        onClick={() => onSwitchUser(coordUser)}
-                        disabled={isCurrent}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                          isCurrent
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default'
-                            : 'bg-teal-600 hover:bg-teal-700 text-white'
-                        }`}
-                      >
-                        <LogIn className="w-3.5 h-3.5" />
-                        <span>{isCurrent ? 'أنت داخل الحساب' : 'تسجيل الدخول كمنسق'}</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -1112,7 +1097,7 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="مثال: مستشفى حراء العام"
+                  placeholder="اسم المنشأة الصحية"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white text-slate-800"
@@ -1125,7 +1110,7 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="مثال: مكة المكرمة"
+                    placeholder="المدينة / المنطقة الإدارية"
                     value={formLocation}
                     onChange={(e) => setFormLocation(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white text-slate-800"
@@ -1151,7 +1136,7 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
                   <label className="block font-bold text-slate-700 mb-1">اسم منسق مكافحة العدوى</label>
                   <input
                     type="text"
-                    placeholder="اسم المنسق المعتمد"
+                    placeholder="الاسم والصفة الوظيفية للمنسق"
                     value={formCoordName}
                     onChange={(e) => setFormCoordName(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white text-slate-800"
@@ -1232,7 +1217,7 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="مثال: أ. أحمد الزهراني"
+                  placeholder="الاسم الرباعي والصفة الرسمية للمنسق"
                   value={coordFormName}
                   onChange={(e) => setCoordFormName(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white text-slate-800"

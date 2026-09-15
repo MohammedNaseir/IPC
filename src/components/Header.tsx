@@ -278,7 +278,19 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* User Account & Login / Switcher Dropdown */}
+        {/* Direct Logout Button */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            title="تسجيل الخروج من النظام"
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-slate-200 hover:border-rose-300 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-600" />
+            <span className="hidden sm:inline">تسجيل الخروج</span>
+          </button>
+        )}
+
+        {/* User Account Dropdown */}
         <div className="relative" ref={userRef}>
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
@@ -309,22 +321,22 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </button>
 
-          {/* User Account & Login Menu */}
+          {/* User Account Menu */}
           {showUserMenu && (
-            <div className="absolute left-0 mt-2 w-84 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden text-right">
+            <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden text-right">
               {/* Active Profile Info */}
               <div
-                className={`p-3.5 border-b ${
+                className={`p-4 border-b ${
                   isDevAdmin
                     ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'
                     : 'bg-slate-50 border-slate-100'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">الحساب الحالي</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">الحساب النشط</span>
                   {isDevAdmin ? (
                     <span className="px-2 py-0.5 bg-amber-500 text-white rounded text-[10px] font-bold">
-                      dev admin نشط
+                      dev admin
                     </span>
                   ) : (
                     <span
@@ -338,88 +350,33 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                   )}
                 </div>
-                <p className="text-xs font-bold text-slate-900 mt-1">{currentUser.name}</p>
-                <p className="text-[11px] text-slate-500">{currentUser.email}</p>
+                <p className="text-xs font-bold text-slate-900 mt-1.5">{currentUser.name}</p>
+                <p className="text-[11px] text-slate-500 font-mono" dir="ltr">{currentUser.email}</p>
                 {userHospital && (
-                  <p className="text-[11px] text-emerald-700 font-medium mt-1 flex items-center gap-1">
-                    <Building2 className="w-3 h-3" />
-                    {userHospital.name}
+                  <p className="text-[11px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>{userHospital.name}</span>
                   </p>
                 )}
 
-                {/* Logout Button */}
+                {/* Primary Logout Button */}
                 {onLogout && (
                   <button
                     onClick={() => {
-                      onLogout();
                       setShowUserMenu(false);
-                      if (onOpenLoginModal) onOpenLoginModal();
+                      onLogout();
                     }}
-                    className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-colors shadow-2xs"
+                    className="mt-3.5 w-full flex items-center justify-center gap-2 py-2 px-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold text-rose-700 transition-colors shadow-2xs cursor-pointer"
                   >
-                    <LogOut className="w-3.5 h-3.5 text-rose-600" />
-                    <span>{isDevAdmin ? 'تسجيل الخروج من حساب المطور' : currentUser.role === 'hospital' ? 'تسجيل الخروج من حساب المنسق' : 'تسجيل الخروج'}</span>
+                    <LogOut className="w-4 h-4 text-rose-600" />
+                    <span>تسجيل الخروج من النظام</span>
                   </button>
                 )}
               </div>
 
-              {/* Login with Password Button */}
-              {onOpenLoginModal && (
-                <div className="p-3 bg-slate-50/80 border-b border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onOpenLoginModal();
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>تسجيل الدخول الآمن بكلمة المرور</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Fast Switcher for Central Admin & Dev Only - Hidden from hospital coordinators */}
-              {(isDevAdmin || currentUser.role === 'central') && (
-                <div className="p-2.5 max-h-60 overflow-y-auto space-y-1">
-                  <p className="px-2 py-1 text-[10px] font-bold text-slate-400">
-                    التبديل الإشرافي لحسابات النظام والمنسقين:
-                  </p>
-                  {availableUsers.map((u) => {
-                    const hosp = hospitals.find((h) => h.id === u.hospitalId);
-                    const isSelected = u.id === currentUser.id;
-                    return (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          onSwitchUser(u);
-                          setShowUserMenu(false);
-                        }}
-                        className={`w-full flex items-center justify-between p-2 rounded-lg text-xs transition-colors text-right ${
-                          isSelected
-                            ? 'bg-teal-50 text-teal-900 font-bold border border-teal-200'
-                            : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <div className="overflow-hidden">
-                          <p className="font-medium text-xs truncate">{u.name}</p>
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                            <span>{u.role === 'central' ? 'الإدارة المركزية' : hosp?.name || 'منسق مستشفى'}</span>
-                            <span className="text-slate-300">•</span>
-                            <span className="font-mono text-[9px] text-slate-400 truncate">{u.email}</span>
-                          </div>
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-teal-600 shrink-0 mr-2" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
               {/* Reset to clean/defaults - STRICTLY DEV ADMIN ONLY */}
               {isDevAdmin && (
-                <div className="p-2 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                <div className="p-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
                   <button
                     onClick={() => {
                       if (window.confirm('هل تود استعادة الإعدادات والبيانات الأولية للتطبيق؟')) {

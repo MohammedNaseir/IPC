@@ -43,9 +43,10 @@ import {
 export const DEFAULT_CLEAN_ADMIN: User = {
   id: 'user-central-admin',
   email: 'admin@ipc-cluster.gov.sa',
-  name: 'د. المشرف العام (الإدارة المركزية)',
+  name: 'مشرف الإدارة المركزية لمكافحة العدوى',
   role: 'central',
   hospitalId: null,
+  password: 'admin123',
   createdAt: '2025-01-01T00:00:00.000Z',
 };
 
@@ -754,20 +755,37 @@ export class NeonIPCService {
     return sanitized;
   }
 
-  public getCurrentUser(): User {
+  public getCurrentUser(): User | null {
+    if (typeof window !== 'undefined') {
+      const isLoggedOut = localStorage.getItem('ipc_is_logged_out_v1');
+      if (isLoggedOut === 'true') {
+        return null;
+      }
+    }
     const clean = isCleanSlateActive();
     const defaultUser = clean ? DEFAULT_CLEAN_ADMIN : INITIAL_USERS[0];
-    const user = getStoredItem<User>(STORAGE_KEYS.CURRENT_USER, defaultUser);
+    const user = getStoredItem<User | null>(STORAGE_KEYS.CURRENT_USER, defaultUser);
     return user;
   }
 
-  public setCurrentUser(user: User): void {
-    setStoredItem(STORAGE_KEYS.CURRENT_USER, user);
+  public setCurrentUser(user: User | null): void {
+    if (user) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('ipc_is_logged_out_v1');
+      }
+      setStoredItem(STORAGE_KEYS.CURRENT_USER, user);
+    } else {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ipc_is_logged_out_v1', 'true');
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      }
+      setStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+    }
   }
 
   // Check if active user is Dev Admin
-  public isDevAdmin(user?: User): boolean {
-    const u = user || this.getCurrentUser();
+  public isDevAdmin(user?: User | null): boolean {
+    const u = user !== undefined ? user : this.getCurrentUser();
     if (!u) return false;
     return (
       u.email.toLowerCase() === DEV_ADMIN_EMAIL.toLowerCase() ||
@@ -785,30 +803,53 @@ export class NeonIPCService {
 
   // Official Password Login (Strict authentication with email and password)
   public loginWithPassword(email: string, password: string): { success: boolean; user?: User; message?: string } {
-    const normalized = email.trim().toLowerCase();
+    const rawNormalized = email.trim().toLowerCase();
     const trimmedPass = password.trim();
 
-    if (!normalized) {
+    if (!rawNormalized) {
       return { success: false, message: 'يرجى إدخال البريد الإلكتروني.' };
     }
     if (!trimmedPass) {
       return { success: false, message: 'يرجى إدخال كلمة المرور.' };
     }
 
+    // Support legacy email aliases so both new standard and previously used emails work seamlessly
+    const emailAliases: Record<string, string> = {
+      'k.subaie@kfsh.med.sa': 'coordinator.kfsh@cluster.med.sa',
+      'h.qurashi@alnoor.med.sa': 'coordinator.alnoor@cluster.med.sa',
+      'm.abdullah@maternity.med.sa': 'coordinator.maternity@cluster.med.sa',
+      'f.tamimi@psh.med.sa': 'coordinator.psh@cluster.med.sa',
+    };
+    const normalized = emailAliases[rawNormalized] || rawNormalized;
+
     // 1. Dev Admin Hidden Entry (Stealth, only active for dev emails)
-    if (this.isDevAdminEmail(normalized)) {
+    if (this.isDevAdminEmail(normalized) || this.isDevAdminEmail(rawNormalized)) {
       if (trimmedPass === 'dev123' || trimmedPass === 'admin123' || trimmedPass.length >= 4) {
         this.setCurrentUser(DEV_ADMIN_USER);
         this.logAudit('Hospital', 'dev-root', 'تسجيل دخول المشرف المطور (dev admin)', 'dev admin');
         return { success: true, user: DEV_ADMIN_USER };
       } else {
-        return { success: false, message: 'كلمة المرور غير صحيحة لحساب المطور (جرب dev123).' };
+        return { success: false, message: 'كلمة المرور غير صحيحة لحساب المطور.' };
       }
     }
 
-    // 2. Search in registered users & coordinators
+    // 2. Central Admin default check
+    if (normalized === 'admin@ipc-cluster.gov.sa') {
+      if (trimmedPass === 'admin123' || trimmedPass === '123456') {
+        const centralUser = this.getUsers().find((u) => u.email.toLowerCase() === 'admin@ipc-cluster.gov.sa') || DEFAULT_CLEAN_ADMIN;
+        this.setCurrentUser(centralUser);
+        this.logAudit('Hospital', 'central', `تسجيل دخول المشرف: ${centralUser.name}`, centralUser.name);
+        return { success: true, user: centralUser };
+      } else {
+        return { success: false, message: 'كلمة المرور غير صحيحة لحساب الإدارة المركزية.' };
+      }
+    }
+
+    // 3. Search in registered users & coordinators
     const users = this.getUsers();
-    const matchedUser = users.find((u) => u.email.toLowerCase() === normalized);
+    const matchedUser = users.find(
+      (u) => u.email.toLowerCase() === normalized || u.email.toLowerCase() === rawNormalized
+    );
     if (matchedUser) {
       const validPass = matchedUser.password || '123456';
       if (trimmedPass === validPass || trimmedPass === 'admin123' || trimmedPass === '123456') {
@@ -824,10 +865,12 @@ export class NeonIPCService {
       return { success: false, message: 'كلمة المرور غير صحيحة. يرجى التأكد والمحاولة مجدداً.' };
     }
 
-    // 3. Search in hospitals list for coordinator emails
+    // 4. Search in hospitals list for coordinator emails
     const hospitals = this.getHospitals();
     const matchedHospital = hospitals.find(
-      (h) => h.coordinatorEmail && h.coordinatorEmail.toLowerCase() === normalized
+      (h) =>
+        (h.coordinatorEmail && h.coordinatorEmail.toLowerCase() === normalized) ||
+        (h.coordinatorEmail && h.coordinatorEmail.toLowerCase() === rawNormalized)
     );
     if (matchedHospital) {
       if (trimmedPass === '123456' || trimmedPass === 'admin123' || trimmedPass.length >= 4) {
@@ -835,8 +878,8 @@ export class NeonIPCService {
           id: `user-coord-${matchedHospital.id}`,
           email: matchedHospital.coordinatorEmail,
           name: matchedHospital.coordinatorName
-            ? `${matchedHospital.coordinatorName} (منسق ${matchedHospital.name})`
-            : `منسق ${matchedHospital.name}`,
+            ? `${matchedHospital.coordinatorName} (${matchedHospital.name})`
+            : `منسق مكافحة العدوى (${matchedHospital.name})`,
           role: 'hospital',
           hospitalId: matchedHospital.id,
           password: trimmedPass,
@@ -851,7 +894,7 @@ export class NeonIPCService {
 
     return {
       success: false,
-      message: 'البريد الإلكتروني المدخل غير مسجل كمنسق مستشفى أو مشرف بالنظام.',
+      message: 'البريد الإلكتروني المدخل غير مسجل كمنسق منشأة أو مشرف بالنظام.',
     };
   }
 
@@ -915,7 +958,7 @@ export class NeonIPCService {
       'Hospital',
       data.hospitalId,
       `تعيين واعتماد منسق مستشفى جديد: ${data.name} (${normEmail})`,
-      this.getCurrentUser().name
+      this.getCurrentUser()?.name || 'مدير النظام'
     );
 
     return { success: true, user: newCoordUser };
@@ -946,15 +989,16 @@ export class NeonIPCService {
     const storedUsers = getStoredItem<User[]>(STORAGE_KEYS.USERS, INITIAL_USERS);
     const updated = storedUsers.map((u) => (u.id === userId ? { ...u, password: newPassword } : u));
     setStoredItem(STORAGE_KEYS.USERS, updated);
-    this.logAudit('Hospital', userId, `إعادة تعيين كلمة المرور للمستخدم (${userId})`, this.getCurrentUser().name);
+    this.logAudit('Hospital', userId, `إعادة تعيين كلمة المرور للمستخدم (${userId})`, this.getCurrentUser()?.name || 'مدير النظام');
   }
 
-  // Logout - Revert to standard central admin
-  public logout(): User {
-    const clean = isCleanSlateActive();
-    const defaultUser = clean ? DEFAULT_CLEAN_ADMIN : INITIAL_USERS[0];
-    this.setCurrentUser(defaultUser);
-    return defaultUser;
+  // Logout - Fully terminates active session so the user is returned to the Login Page
+  public logout(): void {
+    const active = this.getCurrentUser();
+    if (active) {
+      this.logAudit('Hospital', active.hospitalId || 'central', `تسجيل خروج المستخدم: ${active.name}`, active.name);
+    }
+    this.setCurrentUser(null);
   }
 
   // --- Audit Logs (FR-13, 5.4) ---
@@ -1062,8 +1106,9 @@ export class NeonIPCService {
 
   // --- Visits (FR-9 to FR-16) ---
   public getVisits(role?: UserRole, hospitalId?: string | null): Visit[] {
-    const activeRole = role || this.getCurrentUser().role;
-    const activeHospitalId = hospitalId !== undefined ? hospitalId : this.getCurrentUser().hospitalId;
+    const activeUser = this.getCurrentUser();
+    const activeRole = role || activeUser?.role || 'central';
+    const activeHospitalId = hospitalId !== undefined ? hospitalId : activeUser?.hospitalId;
     const allVisits = getStoredItem<Visit[]>(STORAGE_KEYS.VISITS, INITIAL_VISITS);
     // FR-16: Central sees all with filter, Hospital strictly restricted to their hospital
     if (activeRole === 'hospital' && activeHospitalId) {
@@ -1192,7 +1237,7 @@ export class NeonIPCService {
     let noteText = '';
     let finalAttUrl = attachmentUrl;
     let finalAttName = attachmentName;
-    let finalRespondent = user?.name || this.getCurrentUser().name || 'منسق مكافحة العدوى';
+    let finalRespondent = user?.name || this.getCurrentUser()?.name || 'منسق مكافحة العدوى';
 
     if (typeof responseOrNote === 'object') {
       noteText = responseOrNote.note;
@@ -1288,8 +1333,9 @@ export class NeonIPCService {
   }
 
   public getTrainings(role?: UserRole, hospitalId?: string | null): Training[] {
-    const activeRole = role || this.getCurrentUser().role;
-    const activeHospitalId = hospitalId !== undefined ? hospitalId : this.getCurrentUser().hospitalId;
+    const activeUser = this.getCurrentUser();
+    const activeRole = role || activeUser?.role || 'central';
+    const activeHospitalId = hospitalId !== undefined ? hospitalId : activeUser?.hospitalId;
     const allTrainings = getStoredItem<Training[]>(STORAGE_KEYS.TRAININGS, INITIAL_TRAININGS);
     // Auto calculate late status if past due date and not completed (FR-22)
     const templates = this.getTrainingTemplates();
@@ -1695,8 +1741,9 @@ export class NeonIPCService {
   }
 
   // --- Notifications (FR-35 to FR-37) ---
-  public getNotifications(user?: User): Notification[] {
-    const activeUser = user || this.getCurrentUser();
+  public getNotifications(user?: User | null): Notification[] {
+    const activeUser = user !== undefined ? user : this.getCurrentUser();
+    if (!activeUser) return [];
     const all = getStoredItem<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     // Return notifications relevant to user
     return all.filter(n => n.userId === activeUser.id || n.userId === 'all' || (activeUser.hospitalId && n.userId === `coord-${activeUser.hospitalId}`));
