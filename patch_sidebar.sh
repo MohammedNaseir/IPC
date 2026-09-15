@@ -1,77 +1,5 @@
-import React from 'react';
-import {
-  LayoutDashboard,
-  ClipboardCheck,
-  GraduationCap,
-  Building2,
-  Users2,
-  FileText,
-  Network,
-  FolderKanban,
-  FileArchive,
-  ShieldAlert,
-  Database,
-  ShieldCheck,
-  Building,
-  LogOut,
-} from 'lucide-react';
-import { UserRole } from '../types/ipc';
-
-export type ActiveTab =
-  | 'dashboard'
-  | 'visits'
-  | 'trainings'
-  | 'hospitals'
-  | 'assets'
-  | 'policies'
-  | 'orgDocs'
-  | 'docCenter'
-  | 'programs'
-  | 'audit';
-
-interface SidebarProps {
-  activeTab: ActiveTab;
-  setActiveTab: (tab: ActiveTab) => void;
-  userRole: UserRole;
-  currentHospitalName?: string;
-  isNeonConnected: boolean;
-  onOpenNeonModal: () => void;
-  isMobileOpen: boolean;
-  setIsMobileOpen: (open: boolean) => void;
-  isDevAdmin?: boolean;
-  onLogout?: () => void;
-}
-
-export const Sidebar: React.FC<SidebarProps> = ({
-  activeTab,
-  setActiveTab,
-  userRole,
-  currentHospitalName,
-  isNeonConnected,
-  onOpenNeonModal,
-  isMobileOpen,
-  setIsMobileOpen,
-  isDevAdmin = false,
-  onLogout,
-}) => {
-  const isCentral = userRole === 'central' || isDevAdmin;
-
-  const handleNavClick = (tab: ActiveTab) => {
-    setActiveTab(tab);
-    setIsMobileOpen(false);
-  };
-
-  return (
-    <>
-      {/* Mobile Backdrop */}
-      {isMobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs lg:hidden"
-          onClick={() => setIsMobileOpen(false)}
-        />
-      )}
-
-      {/* Metronic Dark Sidebar */}
+#!/bin/bash
+cat << 'INNER_EOF' > /tmp/sidebar_new.txt
       {/* Metronic Dark Sidebar */}
       <aside
         className={`fixed top-0 bottom-0 right-0 z-40 w-64 bg-[#1e1e2d] text-[#9899ac] flex flex-col transition-transform duration-300 ease-in-out border-l border-[#151521] ${
@@ -282,6 +210,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </aside>
-    </>
-  );
-};
+INNER_EOF
+
+sed -i '/<aside/,/<\/aside>/c\$(cat /tmp/sidebar_new.txt)' src/components/Sidebar.tsx
+# Using awk is safer for multi-line replacement
+awk -v r="$(cat /tmp/sidebar_new.txt)" '
+  /<aside/ { p=1; print r; next }
+  /<\/aside>/ { p=0; next }
+  !p { print }
+' src/components/Sidebar.tsx > src/components/Sidebar_tmp.tsx
+mv src/components/Sidebar_tmp.tsx src/components/Sidebar.tsx

@@ -442,7 +442,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="د. محمد السبيعي"
+                  placeholder="اسم الممارس"
                   value={pracName}
                   onChange={(e) => setPracName(e.target.value)}
                   className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"

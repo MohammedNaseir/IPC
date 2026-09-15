@@ -67,7 +67,7 @@ export const VisitsView: React.FC<VisitsViewProps> = ({
   // New Visit form
   const [newHospId, setNewHospId] = useState(hospitals[0]?.id || '');
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
-  const [newTeam, setNewTeam] = useState('د. إبراهيم الدوسري، أخصائي تمريض وضبط عدوى');
+  const [newTeam, setNewTeam] = useState('اسم عضو الفريق');
   const [newDetails, setNewDetails] = useState('');
   const [newCompliance, setNewCompliance] = useState<number>(85);
 
@@ -658,7 +658,7 @@ export const VisitsView: React.FC<VisitsViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="د. فلان، أخصائي تمريض فلان..."
+                  placeholder="أعضاء الفريق"
                   value={newTeam}
                   onChange={(e) => setNewTeam(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"

@@ -144,31 +144,12 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Center/Right controls */}
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Hospital Selector for Central role or Dev Admin */}
-        {(currentUser.role === 'central' || isDevAdmin) ? (
-          <div className="hidden md:flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
-            <span className="text-slate-500 text-[11px]">فلترة المنشأة:</span>
-            <select
-              value={selectedHospitalId || ''}
-              onChange={(e) => onSelectHospital(e.target.value ? e.target.value : null)}
-              className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer text-xs"
-            >
-              <option value="">كافة المستشفيات (عرض شامل)</option>
-              {hospitals.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
+        {/* Strictly isolated coordinator badge: Locked to their hospital */}
+        {!(currentUser.role === 'central' || isDevAdmin) && userHospital && (
+          <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-2.5 py-1 text-xs font-bold">
+            <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>المنشأة التابع لها: {userHospital.name}</span>
           </div>
-        ) : (
-          /* Strictly isolated coordinator badge: Locked to their hospital */
-          userHospital && (
-            <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-2.5 py-1 text-xs font-bold">
-              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>المنشأة التابع لها: {userHospital.name}</span>
-            </div>
-          )
         )}
 
         {/* Database Indicator Button - STRICTLY DEV ADMIN ONLY */}

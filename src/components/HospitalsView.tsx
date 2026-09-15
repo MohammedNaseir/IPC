@@ -547,8 +547,10 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
+      {!selectedHospitalForProfile ? (
+        <>
+          {/* Top Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>المنشآت والأصول</span>
@@ -888,35 +890,36 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
         </div>
       )}
 
-      {/* Comprehensive Hospital Profile Modal */}
-      {selectedHospitalForProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in" dir="rtl">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-white">
-                    البروفايل الشامل للمستشفى - {selectedHospitalForProfile.name}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    تجميع بيانات المستشفى الموحدة (الكوادر، الأجهزة، التدريبات، والزيارات الرقابية)
-                  </p>
-                </div>
-              </div>
+        </>
+      ) : (
+      /* Comprehensive Hospital Profile View */
+      <div className="bg-white rounded-xl shadow-md border border-slate-200 w-full flex flex-col overflow-hidden animate-fade-in" dir="rtl">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-5 bg-slate-900 text-white gap-4">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setSelectedHospitalForProfile(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-md"
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors text-slate-300 hover:text-white"
+                title="العودة للقائمة"
               >
-                <X className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4" />
               </button>
+              <div className="w-10 h-10 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">
+                  البروفايل الشامل للمستشفى - {selectedHospitalForProfile.name}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  تجميع بيانات المستشفى الموحدة (الكوادر، الأجهزة، التدريبات، والزيارات الرقابية)
+                </p>
+              </div>
             </div>
+          </div>
 
-            {/* Modal Body: Aggregated Profile */}
-            <div className="p-6 overflow-y-auto space-y-6">
+          {/* Body: Aggregated Profile */}
+          <div className="p-4 sm:p-6 space-y-6">
               {/* Facility Details Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
                 <div>
@@ -1074,7 +1077,6 @@ export const HospitalsView: React.FC<HospitalsViewProps> = ({
               </button>
             </div>
           </div>
-        </div>
       )}
 
       {/* Add Hospital Modal */}
