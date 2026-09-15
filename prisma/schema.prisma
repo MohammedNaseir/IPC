@@ -1,15 +1,12 @@
-// Prisma Schema for IPC Management Portal (منصة إدارة مكافحة العدوى)
-// As specified in the SRS document v1.0
-// Compatible with Neon.tech PostgreSQL Serverless
-
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
+// IPC Management Portal — data model per SRS v1.0 §4 (19 entities) plus StoredFile for secure uploads.
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
 }
 
 enum Role {
@@ -22,6 +19,7 @@ enum VisitStatus {
   completed
 }
 
+// `late` is derived at read time from the template due date; only pending/completed are persisted.
 enum TrainingStatus {
   pending
   late
@@ -46,215 +44,255 @@ enum NotificationType {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  passwordHash String
-  name         String         @default("مستخدم")
-  role         Role           @default(hospital)
-  hospitalId   String?
-  createdAt    DateTime       @default(now())
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String
+  role           Role
+  // Unique: SRS §6 allows exactly one coordinator account per hospital. Null for central users.
+  hospitalId     String?  @unique
+  // Incremented on password/email change to invalidate existing sessions.
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
 
-  hospital     Hospital?      @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  hospital      Hospital?      @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
   notifications Notification[]
+  auditLogs     AuditLog[]
+  uploadedFiles StoredFile[]
 }
 
 model Hospital {
-  id               String         @id @default(cuid())
-  name             String
-  location         String
-  type             String
-  coordinatorName  String         @default("")
-  coordinatorEmail String         @default("")
-  isActive         Boolean        @default(true)
-  createdAt        DateTime       @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  location  String
+  type      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
-  users            User[]
-  visits           Visit[]
-  trainings        Training[]
-  practitioners    Practitioner[]
-  equipments       Equipment[]
+  coordinator   User?
+  visits        Visit[]
+  trainings     Training[]
+  practitioners Practitioner[]
+  equipments    Equipment[]
+  files         StoredFile[]
 }
 
 model Visit {
-  id          String            @id @default(cuid())
-  hospitalId  String
-  visitDate   DateTime
-  team        String
-  details     String
-  reportUrl   String            @default("")
-  reportName  String            @default("تقرير الزيارة")
-  status      VisitStatus       @default(in_progress)
-  complianceScore Float?        @default(85.0)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id              String      @id @default(cuid())
+  hospitalId      String
+  visitDate       DateTime
+  team            String
+  details         String
+  reportFileId    String?     @unique
+  status          VisitStatus @default(in_progress)
+  complianceScore Float?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  hospital    Hospital          @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  hospital    Hospital          @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+  reportFile  StoredFile?       @relation("VisitReport", fields: [reportFileId], references: [id], onDelete: SetNull)
   attachments VisitAttachment[]
   responses   VisitResponse[]
+
+  @@index([hospitalId])
 }
 
 model VisitAttachment {
   id         String   @id @default(cuid())
   visitId    String
-  fileName   String   @default("مرفق")
-  fileUrl    String
+  fileId     String   @unique
   uploadedAt DateTime @default(now())
 
-  visit      Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit Visit      @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  file  StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([visitId])
 }
 
 model VisitResponse {
-  id             String   @id @default(cuid())
-  visitId        String
-  note           String
-  attachmentUrl  String?
-  attachmentName String?
-  respondentName String   @default("منسق المستشفى")
-  respondedAt    DateTime @default(now())
+  id               String   @id @default(cuid())
+  visitId          String
+  note             String
+  attachmentFileId String?  @unique
+  respondentName   String
+  respondedAt      DateTime @default(now())
 
-  visit          Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit      Visit       @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  attachment StoredFile? @relation("VisitResponseAttachment", fields: [attachmentFileId], references: [id], onDelete: SetNull)
+
+  @@index([visitId])
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  entityType  String   // Visit, Training, Hospital, etc.
-  entityId    String
-  action      String   // Create, Update, Response, Complete, etc.
-  performedBy String
-  timestamp   DateTime @default(now())
+  id              String   @id @default(cuid())
+  entityType      String
+  entityId        String
+  action          String
+  performedById   String?
+  // Snapshot of the actor's name so the log stays readable and unchanged if the user is later renamed.
+  performedByName String
+  timestamp       DateTime @default(now())
+
+  performedBy User? @relation(fields: [performedById], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([timestamp])
 }
 
 model TrainingTemplate {
-  id          String     @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   description String
   dueDate     DateTime
-  createdAt   DateTime   @default(now())
+  createdAt   DateTime @default(now())
 
-  trainings   Training[]
+  trainings Training[]
 }
 
 model Training {
-  id          String               @id @default(cuid())
+  id          String         @id @default(cuid())
   templateId  String?
   hospitalId  String
   title       String
   description String
-  deliveredBy String               @default("")
+  deliveredBy String?
   date        DateTime?
-  status      TrainingStatus       @default(pending)
-  createdAt   DateTime             @default(now())
+  notes       String?
+  status      TrainingStatus @default(pending)
+  createdAt   DateTime       @default(now())
 
-  template    TrainingTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  hospital    Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  template    TrainingTemplate?    @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  hospital    Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
   attachments TrainingAttachment[]
   attendances TrainingAttendance[]
+
+  @@unique([templateId, hospitalId])
+  @@index([hospitalId])
 }
 
 model TrainingAttachment {
   id         String   @id @default(cuid())
   trainingId String
-  fileName   String   @default("مرفق تدريب")
-  fileUrl    String
+  fileId     String   @unique
   uploadedAt DateTime @default(now())
 
-  training   Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  training Training   @relation(fields: [trainingId], references: [id], onDelete: Restrict)
+  file     StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([trainingId])
 }
 
 model TrainingAttendance {
-  id             String        @id @default(cuid())
+  id             String  @id @default(cuid())
   trainingId     String
   practitionerId String?
   headcount      Int?
 
-  training       Training      @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  practitioner   Practitioner? @relation(fields: [practitionerId], references: [id], onDelete: SetNull)
+  training     Training      @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  practitioner Practitioner? @relation(fields: [practitionerId], references: [id], onDelete: SetNull)
+
+  @@index([trainingId])
 }
 
 model Practitioner {
   id            String   @id @default(cuid())
   hospitalId    String
   name          String
-  role          String   // Specialization or Job title
+  role          String
   licenseNumber String?
-  contact       String?
+  email         String?
+  phone         String?
+  createdAt     DateTime @default(now())
 
-  hospital      Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
-  attendances   TrainingAttendance[]
+  hospital    Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+  attendances TrainingAttendance[]
+
+  @@index([hospitalId])
 }
 
 model Equipment {
-  id           String   @id @default(cuid())
-  hospitalId   String
-  name         String
-  type         String
-  serialNumber String?
-  status       String?
+  id              String    @id @default(cuid())
+  hospitalId      String
+  name            String
+  type            String
+  serialNumber    String?
+  status          String?
+  lastMaintenance DateTime?
+  createdAt       DateTime  @default(now())
 
-  hospital     Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+
+  @@index([hospitalId])
 }
 
 model Policy {
   id         String         @id @default(cuid())
   title      String
-  category   PolicyCategory @default(policy)
-  fileUrl    String
-  fileName   String         @default("وثيقة سياسة")
-  version    String?        @default("1.0")
+  category   PolicyCategory
+  version    String         @default("1.0")
+  fileId     String         @unique
   uploadedAt DateTime       @default(now())
+
+  file StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
 }
 
 model OrgDocument {
   id         String     @id @default(cuid())
   title      String
   type       OrgDocType
-  fileUrl    String
-  fileName   String     @default("مستند تنظيمي")
+  fileId     String     @unique
   uploadedAt DateTime   @default(now())
+
+  file StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
 }
 
 model DocumentCenterFile {
   id         String   @id @default(cuid())
   title      String
-  fileUrl    String
-  fileName   String   @default("وثيقة")
-  category   String?  @default("عام")
+  fileId     String   @unique
   uploadedAt DateTime @default(now())
+
+  file StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
 }
 
 model Program {
-  id          String          @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime        @default(now())
+  createdAt   DateTime @default(now())
 
-  folders     ProgramFolder[]
-  files       ProgramFile[]
+  folders ProgramFolder[]
+  files   ProgramFile[]
 }
 
 model ProgramFolder {
-  id             String          @id @default(cuid())
+  id             String  @id @default(cuid())
   programId      String
   parentFolderId String?
   name           String
+  description    String?
 
-  program        Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  parentFolder   ProgramFolder?  @relation("SubFolders", fields: [parentFolderId], references: [id], onDelete: Cascade)
-  subFolders     ProgramFolder[] @relation("SubFolders")
-  files          ProgramFile[]
+  program      Program         @relation(fields: [programId], references: [id], onDelete: Restrict)
+  parentFolder ProgramFolder?  @relation("SubFolders", fields: [parentFolderId], references: [id], onDelete: Restrict)
+  subFolders   ProgramFolder[] @relation("SubFolders")
+  files        ProgramFile[]
+
+  @@index([programId])
 }
 
 model ProgramFile {
-  id        String         @id @default(cuid())
+  id        String   @id @default(cuid())
   programId String
   folderId  String?
   name      String
-  fileUrl   String
-  fileSize  String?        @default("1.2 MB")
-  createdAt DateTime       @default(now())
+  fileId    String   @unique
+  createdAt DateTime @default(now())
 
-  program   Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
-  folder    ProgramFolder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  program Program        @relation(fields: [programId], references: [id], onDelete: Restrict)
+  folder  ProgramFolder? @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  file    StoredFile     @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([programId])
 }
 
 model Notification {
@@ -262,8 +300,40 @@ model Notification {
   userId    String
   type      NotificationType
   message   String
+  link      String?
+  // Source record (visit/training/document id), used to avoid duplicate reminders.
+  entityId  String?
   isRead    Boolean          @default(false)
   createdAt DateTime         @default(now())
 
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, entityId])
+}
+
+// Uploaded file bytes. hospitalId scopes download access: null = cluster-wide library visible to all signed-in users.
+model StoredFile {
+  id           String   @id @default(cuid())
+  name         String
+  mimeType     String
+  size         Int
+  data         Bytes
+  hospitalId   String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  hospital   Hospital? @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+  uploadedBy User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  visitReport        Visit?              @relation("VisitReport")
+  visitAttachment    VisitAttachment?
+  visitResponse      VisitResponse?      @relation("VisitResponseAttachment")
+  trainingAttachment TrainingAttachment?
+  policy             Policy?
+  orgDocument        OrgDocument?
+  documentCenterFile DocumentCenterFile?
+  programFile        ProgramFile?
+
+  @@index([hospitalId])
 }

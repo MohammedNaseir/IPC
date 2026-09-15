@@ -1,6 +1,0 @@
-{
-  "name": "منصة إدارة مكافحة العدوى - IPC Cluster Portal",
-  "description": "منصة رقمية موحدة لإدارة وحوكمة أنشطة مكافحة العدوى والصحة العامة على مستوى المنشآت الصحية والتجمع الصحي.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
