@@ -763,7 +763,7 @@ export class NeonIPCService {
       }
     }
     const clean = isCleanSlateActive();
-    const defaultUser = clean ? DEFAULT_CLEAN_ADMIN : INITIAL_USERS[0];
+    const defaultUser = null; // Enforce login screen
     const user = getStoredItem<User | null>(STORAGE_KEYS.CURRENT_USER, defaultUser);
     return user;
   }

@@ -123,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-800 text-sm md:text-base tracking-tight">
-              منصة إدارة مكافحة العدوى والتعقيم
+              إدارة مكافحة العدوى
             </span>
             <span className="hidden md:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

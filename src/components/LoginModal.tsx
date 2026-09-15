@@ -107,7 +107,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             تسجيل الدخول للمنصة الموحدة
           </h2>
           <p className="text-xs text-teal-300/90 mt-1">
-            منظومة حوكمة مكافحة العدوى والتعقيم بالتجمع الصحي
+            إدارة مكافحة العدوى
           </p>
         </div>
 

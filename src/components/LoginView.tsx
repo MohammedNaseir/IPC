@@ -87,7 +87,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
               <h1 className="text-xl font-bold tracking-tight">بوابة الدخول الموحدة</h1>
               <p className="text-xs text-teal-100/90 mt-1 font-medium max-w-xs">
-                منظومة حوكمة مكافحة العدوى والتعقيم بالتجمع الصحي
+                إدارة مكافحة العدوى
               </p>
             </div>
           </div>
@@ -233,7 +233,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
         {/* Footer info */}
         <div className="mt-6 text-center text-xs text-slate-400">
-          منظومة حوكمة مكافحة العدوى والتعقيم © {new Date().getFullYear()}
+          إدارة مكافحة العدوى © {new Date().getFullYear()}
         </div>
       </div>
     </div>
