@@ -312,13 +312,13 @@ model Notification {
   @@index([type, entityId])
 }
 
-// Uploaded file bytes. hospitalId scopes download access: null = cluster-wide library visible to all signed-in users.
+// Uploaded file metadata; bytes live on disk under UPLOADS_DIR. hospitalId scopes download access: null = cluster-wide library visible to all signed-in users.
 model StoredFile {
   id           String   @id @default(cuid())
   name         String
   mimeType     String
   size         Int
-  data         Bytes
+  path         String
   hospitalId   String?
   uploadedById String?
   createdAt    DateTime @default(now())

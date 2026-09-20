@@ -27,14 +27,14 @@ Prisma 7: no `url` in `schema.prisma`; CLI datasource lives in `prisma.config.ts
 ## 3. Security architecture (keep these invariants)
 
 - **Prisma is only imported under `src/server/**`**, every module there starts with `import 'server-only'`. Client components (`'use client'`) import only Server Actions from `src/server/actions/*` and types from `src/lib/*`.
-- **No `NEXT_PUBLIC_` or `VITE_` env vars.** All env vars are server-only: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` (≥32 chars), `CRON_SECRET`.
+- **No `NEXT_PUBLIC_` or `VITE_` env vars.** All env vars are server-only: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` (≥32 chars), `CRON_SECRET`, `UPLOADS_DIR`.
 - **Auth** (`src/server/auth/`): login verifies bcrypt against `User.passwordHash` (dummy hash compare for unknown emails). Session = httpOnly/Secure/SameSite=Lax cookie `ipc_session` (8h) holding a signed JWT `{sub, role, hid, sv}`. `getCurrentUser()` re-reads the user from the DB on every request, rejects if `sessionVersion` changed (password/email change) or the coordinator's hospital is disabled. There is **no** passwordless login, impersonation, default password or superuser.
 - **Authorization is layered**:
   1. `src/proxy.ts` — no session → `/login` (401 for `/api/*`); `/hospitals`, `/audit`, `/api/reports` central-only; `/hospital-profile` hospital-only.
   2. Pages — `requirePageUser/Central/Hospital()`.
   3. Queries (`src/server/queries/*`) — hospital-owned rows filtered with `hospitalScope(user)`.
   4. Server Actions (`src/server/actions/*`) — every export starts with `requireActionUser()`/`requireActionCentral()`, validates input with zod, loads target rows with `{ id, ...hospitalScope(user) }` (404-style error on miss), and wraps work in `runAction()` (user-facing errors only, calls `refresh()`).
-- **Files**: uploads go through `storeUpload()` (extension allowlist + magic-byte check, 8 MB, stored as bytes in `StoredFile`). `StoredFile.hospitalId` scopes access (null = library visible to all signed-in users). Download only via `GET /api/files/[id]`, which re-checks scope and returns 404 across hospitals.
+- **Files**: uploads go through `storeUpload()` (extension allowlist + magic-byte check, 8 MB, written to disk under `UPLOADS_DIR`; `StoredFile` holds only metadata + `path`). `StoredFile.hospitalId` scopes access (null = library visible to all signed-in users). Download only via `GET /api/files/[id]`, which re-checks scope and streams the file off disk (returns 404 across hospitals, or if the file is missing on disk).
 - **Audit**: every mutation calls `logAudit()` inside its transaction. A DB trigger (in the init migration) blocks UPDATE/DELETE on `AuditLog`.
 - Completed visits are immutable (`loadOpenVisit` rejects writes).
 
@@ -82,4 +82,4 @@ Schedule `GET /api/cron/notifications` (Authorization: Bearer $CRON_SECRET), e.g
 - FR-43 export is Excel-compatible CSV, not native `.xlsx`.
 - No login rate limiting / lockout; no password self-service reset (central resets coordinator passwords).
 - Audit screen shows latest 500 entries (no pagination).
-- Files are stored in Postgres; move to object storage if volume grows.
+- File bytes live on local disk under `UPLOADS_DIR`, not in Postgres. On a failed upload transaction the written file is not cleaned up (harmless orphan, no automated sweep yet).

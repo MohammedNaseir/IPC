@@ -1,6 +1,6 @@
 import { prisma } from '@/server/db';
 import { getCurrentUser } from '@/server/auth/session';
-import { INLINE_MIME_TYPES } from '@/server/files';
+import { INLINE_MIME_TYPES, readStoredFile } from '@/server/files';
 
 const notFound = () => new Response('Not found', { status: 404 });
 
@@ -13,12 +13,19 @@ export async function GET(_request: Request, ctx: RouteContext<'/api/files/[id]'
 
   const file = await prisma.storedFile.findUnique({
     where: { id },
-    select: { name: true, mimeType: true, size: true, data: true, hospitalId: true },
+    select: { name: true, mimeType: true, size: true, path: true, hospitalId: true },
   });
   if (!file) return notFound();
 
   // Hospital-owned files are only served to that hospital's coordinator and central users; 404 avoids confirming existence.
   if (file.hospitalId && user.role !== 'central' && user.hospitalId !== file.hospitalId) {
+    return notFound();
+  }
+
+  let data: Buffer;
+  try {
+    data = await readStoredFile(file.path);
+  } catch {
     return notFound();
   }
 
@@ -35,5 +42,5 @@ export async function GET(_request: Request, ctx: RouteContext<'/api/files/[id]'
     headers.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; sandbox");
   }
 
-  return new Response(Buffer.from(file.data), { status: 200, headers });
+  return new Response(new Uint8Array(data), { status: 200, headers });
 }
