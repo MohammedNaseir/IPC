@@ -18,16 +18,17 @@ export async function listTrainings(user: SessionUser): Promise<TrainingDTO[]> {
     include: {
       hospital: { select: { name: true } },
       template: { select: { dueDate: true } },
-      attendances: { select: { practitionerId: true, headcount: true } },
+      attendances: { select: { attendeeName: true, headcount: true }, orderBy: { id: 'asc' } },
       attachments: { orderBy: { uploadedAt: 'asc' }, include: { file: { select: fileRefSelect } } },
     },
   });
 
   const now = new Date();
   return rows.map((t) => {
-    const attendeePractitionerIds = t.attendances
-      .map((a) => a.practitionerId)
-      .filter((id): id is string => id !== null);
+    // Attendance is a name list XOR a single headcount row, so exactly one of these contributes.
+    const attendeeNames = t.attendances
+      .map((a) => a.attendeeName)
+      .filter((name): name is string => name !== null);
     const headcount = t.attendances.reduce((sum, a) => sum + (a.headcount ?? 0), 0);
     const dueDate = t.template?.dueDate ?? null;
     return {
@@ -43,8 +44,8 @@ export async function listTrainings(user: SessionUser): Promise<TrainingDTO[]> {
       dueDate: iso(dueDate),
       notes: t.notes,
       status: deriveTrainingStatus(t.status, dueDate, now),
-      attendeeCount: attendeePractitionerIds.length + headcount,
-      attendeePractitionerIds,
+      attendeeCount: attendeeNames.length + headcount,
+      attendeeNames,
       attachments: t.attachments.map((a) => ({ id: a.id, file: toFileRef(a.file), uploadedAt: iso(a.uploadedAt) })),
       createdAt: iso(t.createdAt),
     };

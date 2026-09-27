@@ -5,7 +5,9 @@ import { prisma } from '@/server/db';
 import { requireActionCentral, requireActionUser } from '@/server/auth/session';
 import { assertHospitalAccess, hospitalScope } from '@/server/auth/scope';
 import { logAudit } from '@/server/audit';
-import { readOptionalFile, storeUpload } from '@/server/files';
+import { readOptionalFile, readRequiredFile, storeUpload } from '@/server/files';
+import { parseAttendanceInput, replaceAttendance } from '@/server/attendance/input';
+import { parseAttendanceSheet } from '@/server/attendance/import';
 import { runAction } from '@/server/run-action';
 import { NotFoundError, ValidationError } from '@/server/errors';
 import { dateSchema, formString, idSchema, optionalText, requiredText } from '@/server/validation';
@@ -92,17 +94,8 @@ export async function recordTrainingExecution(formData: FormData) {
     const date = dateSchema('تاريخ إقامة الدورة').parse(formString(formData, 'date'));
     const deliveredBy = requiredText('اسم المدرب', 200).parse(formString(formData, 'deliveredBy'));
     const notes = optionalText(10_000).parse(formString(formData, 'notes'));
-    const practitionerIds = z
-      .array(idSchema)
-      .max(1000)
-      .parse(formData.getAll('practitionerIds').filter((v) => typeof v === 'string'));
-    const headcountRaw = formString(formData, 'headcount');
-    const headcount = headcountRaw ? z.coerce.number().int().min(1).max(100_000).parse(headcountRaw) : null;
+    const attendance = parseAttendanceInput(formData);
     const photo = readOptionalFile(formData, 'photo');
-
-    if (practitionerIds.length === 0 && !headcount) {
-      throw new ValidationError('يرجى اختيار الممارسين الحاضرين أو إدخال إجمالي عدد الحضور.');
-    }
 
     await prisma.$transaction(async (tx) => {
       const training = await tx.training.findFirst({
@@ -111,23 +104,7 @@ export async function recordTrainingExecution(formData: FormData) {
       });
       if (!training) throw new NotFoundError('التدريب غير موجود أو لا تملك صلاحية الوصول إليه.');
 
-      // Named attendees must belong to the training's own hospital (FR-26).
-      if (practitionerIds.length > 0) {
-        const count = await tx.practitioner.count({
-          where: { id: { in: practitionerIds }, hospitalId: training.hospitalId },
-        });
-        if (count !== new Set(practitionerIds).size) {
-          throw new ValidationError('بعض الممارسين المحددين لا ينتمون إلى مستشفى هذا التدريب.');
-        }
-      }
-
-      await tx.trainingAttendance.deleteMany({ where: { trainingId: training.id } });
-      await tx.trainingAttendance.createMany({
-        data:
-          practitionerIds.length > 0
-            ? [...new Set(practitionerIds)].map((practitionerId) => ({ trainingId: training.id, practitionerId }))
-            : [{ trainingId: training.id, headcount }],
-      });
+      const attendees = await replaceAttendance(tx, training.id, attendance);
 
       await tx.training.update({
         where: { id: training.id },
@@ -139,16 +116,47 @@ export async function recordTrainingExecution(formData: FormData) {
         await tx.trainingAttachment.create({ data: { trainingId: training.id, fileId } });
       }
 
-      const attendees = practitionerIds.length > 0 ? new Set(practitionerIds).size : headcount;
+      const how = attendance.mode === 'names' ? 'بأسماء الحاضرين' : 'بإجمالي العدد';
       await logAudit(
         tx,
         actor,
         'Training',
         training.id,
-        `توثيق تنفيذ التدريب "${training.title}" ورصد حضور ${attendees} ممارس`,
+        `توثيق تنفيذ التدريب "${training.title}" ورصد حضور ${attendees} ${how}`,
       );
     });
 
     return null;
+  });
+}
+
+export async function importAttendanceNames(formData: FormData) {
+  return runAction(async () => {
+    const actor = await requireActionUser();
+    const trainingId = idSchema.parse(formString(formData, 'trainingId'));
+    const file = readRequiredFile(formData, 'file');
+
+    // Parsed in memory and discarded: the sheet is a data-entry channel, never a stored document,
+    // so the upload allowlist and access rules for StoredFile stay untouched.
+    const parsed = await parseAttendanceSheet(file);
+
+    await prisma.$transaction(async (tx) => {
+      const training = await tx.training.findFirst({
+        where: { id: trainingId, ...hospitalScope(actor) },
+        select: { id: true, title: true },
+      });
+      if (!training) throw new NotFoundError('التدريب غير موجود أو لا تملك صلاحية الوصول إليه.');
+
+      await replaceAttendance(tx, training.id, { mode: 'names', names: parsed.names });
+      await logAudit(
+        tx,
+        actor,
+        'Training',
+        training.id,
+        `استيراد ${parsed.names.length} اسم حاضر للتدريب "${training.title}" من ملف ${file.name}`,
+      );
+    });
+
+    return parsed.summary;
   });
 }

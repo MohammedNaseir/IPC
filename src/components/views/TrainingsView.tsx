@@ -1,17 +1,35 @@
 'use client';
 
 import { useState } from 'react';
-import { GraduationCap, Plus, Clock, Search, Users, X, FileCheck, CheckCircle2, Paperclip } from 'lucide-react';
-import type { HospitalDTO, PractitionerDTO, SessionUser, TrainingDTO } from '@/lib/types';
+import {
+  GraduationCap,
+  Plus,
+  Clock,
+  Search,
+  Users,
+  X,
+  FileCheck,
+  CheckCircle2,
+  Paperclip,
+  Download,
+  Upload,
+  Trash2,
+} from 'lucide-react';
+import type { HospitalDTO, SessionUser, TrainingDTO } from '@/lib/types';
 import { formatDate, todayInputValue } from '@/lib/format';
-import { createInternalTraining, createTrainingTemplate, recordTrainingExecution } from '@/server/actions/trainings';
+import { ATTENDEE_NAME_MAX_LENGTH, MAX_ATTENDEE_NAMES, type ImportSummary } from '@/lib/attendance';
+import {
+  createInternalTraining,
+  createTrainingTemplate,
+  importAttendanceNames,
+  recordTrainingExecution,
+} from '@/server/actions/trainings';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 
 interface TrainingsViewProps {
   user: SessionUser;
   trainings: TrainingDTO[];
   hospitals: HospitalDTO[];
-  practitioners: PractitionerDTO[];
 }
 
 function statusBadgeClass(status: TrainingDTO['status']): string {
@@ -22,23 +40,75 @@ function statusBadgeClass(status: TrainingDTO['status']): string {
 
 interface ExecutionFormProps {
   training: TrainingDTO;
-  practitioners: PractitionerDTO[];
 }
 
-function ExecutionForm({ training, practitioners }: ExecutionFormProps) {
+function ExecutionForm({ training }: ExecutionFormProps) {
   const { run, isPending } = useActionRunner();
   const [execDate, setExecDate] = useState(training.date?.slice(0, 10) ?? todayInputValue());
   const [execDeliveredBy, setExecDeliveredBy] = useState(training.deliveredBy ?? '');
-  const [execHeadcount, setExecHeadcount] = useState('');
-  const [execSelectedPracIds, setExecSelectedPracIds] = useState<string[]>(training.attendeePractitionerIds);
   const [execNotes, setExecNotes] = useState(training.notes ?? '');
   const [photo, setPhoto] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
 
-  const relevantPractitioners = practitioners.filter((p) => p.hospitalId === training.hospitalId);
+  // Attendance is a name list XOR a headcount; the toggle picks which one this training carries.
+  const [mode, setMode] = useState<'names' | 'headcount'>(training.attendeeNames.length > 0 ? 'names' : 'headcount');
+  const [names, setNames] = useState<string[]>(training.attendeeNames);
+  const [nameDraft, setNameDraft] = useState('');
+  const [headcount, setHeadcount] = useState(
+    training.attendeeNames.length === 0 && training.attendeeCount > 0 ? String(training.attendeeCount) : '',
+  );
 
-  const togglePractitionerSelection = (pracId: string) => {
-    setExecSelectedPracIds((prev) => (prev.includes(pracId) ? prev.filter((id) => id !== pracId) : [...prev, pracId]));
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importKey, setImportKey] = useState(0);
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
+
+  const switchMode = (next: 'names' | 'headcount') => {
+    if (next === mode) return;
+    const losingNames = next === 'headcount' && names.length > 0;
+    const losingHeadcount = next === 'names' && headcount.trim() !== '';
+    if (losingNames && !window.confirm(`سيتم استبدال قائمة الأسماء (${names.length} اسماً) بإجمالي العدد. هل تريد المتابعة؟`)) {
+      return;
+    }
+    if (losingHeadcount && !window.confirm('سيتم استبدال إجمالي العدد بقائمة أسماء الحاضرين. هل تريد المتابعة؟')) {
+      return;
+    }
+    if (next === 'headcount') setNames([]);
+    if (next === 'names') setHeadcount('');
+    setSummary(null);
+    setMode(next);
+  };
+
+  const addName = () => {
+    const name = nameDraft.trim();
+    if (!name) return;
+    if (names.length >= MAX_ATTENDEE_NAMES) {
+      window.alert(`لا يمكن إضافة أكثر من ${MAX_ATTENDEE_NAMES} اسماً. يمكن تسجيل إجمالي العدد بدل الأسماء.`);
+      return;
+    }
+    setNames((prev) => [...prev, name]);
+    setNameDraft('');
+  };
+
+  const removeName = (index: number) => setNames((prev) => prev.filter((_, i) => i !== index));
+
+  const handleImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) return;
+    const formData = new FormData();
+    formData.append('trainingId', training.id);
+    formData.append('file', importFile);
+    run(
+      () => importAttendanceNames(formData),
+      (result) => {
+        setSummary(result);
+        setMode('names');
+        setHeadcount('');
+        setImportFile(null);
+        setImportKey((k) => k + 1);
+        setShowImport(false);
+      },
+    );
   };
 
   const handleExecuteSave = (e: React.FormEvent) => {
@@ -48,8 +118,9 @@ function ExecutionForm({ training, practitioners }: ExecutionFormProps) {
     formData.append('date', execDate);
     formData.append('deliveredBy', execDeliveredBy);
     formData.append('notes', execNotes);
-    execSelectedPracIds.forEach((id) => formData.append('practitionerIds', id));
-    if (execSelectedPracIds.length === 0 && execHeadcount) formData.append('headcount', execHeadcount);
+    formData.append('mode', mode);
+    if (mode === 'names') names.forEach((name) => formData.append('attendeeNames', name));
+    else formData.append('headcount', headcount);
     if (photo) formData.append('photo', photo);
     run(
       () => recordTrainingExecution(formData),
@@ -87,51 +158,185 @@ function ExecutionForm({ training, practitioners }: ExecutionFormProps) {
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="font-bold text-slate-700">تسجيل الحضور: (اختيار ممارسين بالاسم أو إدخال إجمالي العدد)</label>
-          <span className="text-[11px] text-teal-700 font-bold">المحدد بالاسم: {execSelectedPracIds.length} ممارس</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <label className="font-bold text-slate-700">تسجيل الحضور: أسماء الحاضرين أو إجمالي العدد</label>
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => switchMode('names')}
+              className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                mode === 'names' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              أسماء الحاضرين
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('headcount')}
+              className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                mode === 'headcount' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              إجمالي العدد فقط
+            </button>
+          </div>
         </div>
 
-        {relevantPractitioners.length > 0 && (
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 max-h-36 overflow-y-auto space-y-1.5">
-            <p className="text-[10px] text-slate-500 mb-1">
-              انقر لاختيار الممارسين المسجلين بقاعدة البيانات الذين حضروا الدورة:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {relevantPractitioners.map((prac) => {
-                const isChecked = execSelectedPracIds.includes(prac.id);
-                return (
-                  <div
-                    key={prac.id}
-                    onClick={() => togglePractitionerSelection(prac.id)}
-                    className={`p-2 rounded border cursor-pointer flex items-center justify-between transition-colors ${
-                      isChecked ? 'bg-teal-100 border-teal-400 text-teal-900 font-bold' : 'bg-white border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <span className="text-[11px] truncate">
-                      {prac.name} ({prac.role})
-                    </span>
-                    <input type="checkbox" checked={isChecked} readOnly className="accent-teal-600 mr-2" />
-                  </div>
-                );
-              })}
+        {mode === 'names' ? (
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-slate-500">
+                أدخل اسم كل حاضر على حدة، أو استورد قائمة الأسماء من ملف. الأسماء نص حر وغير مرتبطة بسجل الممارسين.
+              </p>
+              <span className="text-[11px] text-teal-700 font-bold shrink-0">{names.length} اسماً</span>
             </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={nameDraft}
+                maxLength={ATTENDEE_NAME_MAX_LENGTH}
+                placeholder="اسم الحاضر"
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addName();
+                  }
+                }}
+                className="flex-1 p-2 bg-white border border-slate-300 rounded-lg text-slate-800"
+              />
+              <button
+                type="button"
+                onClick={addName}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5 text-teal-400" />
+                <span>إضافة</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImport(true)}
+                className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>استيراد من Excel</span>
+              </button>
+            </div>
+
+            {summary && (
+              <div className="bg-white border border-teal-200 rounded-lg p-2.5 text-[11px] text-slate-700 space-y-1">
+                <p className="font-bold text-teal-800">
+                  تم استيراد {summary.imported} اسماً، وتم تجاوز {summary.skipped} صفاً.
+                </p>
+                {summary.skippedReasons.blank > 0 && <p>الصفوف الفارغة المتجاوزة: {summary.skippedReasons.blank}</p>}
+                {summary.skippedReasons.tooLong.length > 0 && (
+                  <p>
+                    أسماء تجاوزت {ATTENDEE_NAME_MAX_LENGTH} حرفاً (الصفوف):{' '}
+                    {summary.skippedReasons.tooLong.map((r) => r.row).join('، ')}
+                  </p>
+                )}
+                {summary.sheetName && <p className="text-slate-500">تمت قراءة الورقة الأولى فقط: {summary.sheetName}</p>}
+              </div>
+            )}
+
+            {names.length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-3">لم يتم إدخال أي اسم بعد</p>
+            ) : (
+              <div className="max-h-44 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {names.map((name, index) => (
+                  <div
+                    key={`${name}-${index}`}
+                    className="p-2 rounded border border-slate-200 bg-white flex items-center justify-between gap-2"
+                  >
+                    <span className="text-[11px] text-slate-800 truncate">{name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeName(index)}
+                      title="إزالة"
+                      className="text-slate-400 hover:text-rose-600 shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="pt-1">
+            <label className="block text-[11px] text-slate-600 mb-1">إجمالي عدد الحضور بدون أسماء (Headcount):</label>
+            <input
+              type="number"
+              min="1"
+              required
+              value={headcount}
+              onChange={(e) => setHeadcount(e.target.value)}
+              className="w-full sm:w-48 p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-mono"
+            />
           </div>
         )}
-
-        <div className="pt-1">
-          <label className="block text-[11px] text-slate-600 mb-1">أو إدخال إجمالي عدد الحضور اليدوي (Headcount):</label>
-          <input
-            type="number"
-            min="1"
-            value={execHeadcount}
-            disabled={execSelectedPracIds.length > 0}
-            required={execSelectedPracIds.length === 0}
-            onChange={(e) => setExecHeadcount(e.target.value)}
-            className="w-full sm:w-48 p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-mono disabled:bg-slate-100 disabled:text-slate-400"
-          />
-        </div>
       </div>
+
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4" dir="rtl">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <Upload className="w-4 h-4 text-teal-400" />
+                استيراد أسماء الحاضرين
+              </h3>
+              <button type="button" onClick={() => setShowImport(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3.5 text-xs">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  استخدم القالب: عمود واحد بعنوان &quot;الاسم&quot; مع صف العنوان، واسم واحد في كل صف. تُتجاهل الصفوف
+                  الفارغة، وتُقرأ الورقة الأولى والعمود الأول فقط.
+                </p>
+                <a
+                  href="/api/templates/attendance-names"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-teal-200 text-teal-700 rounded-lg font-bold text-[11px] hover:bg-teal-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تنزيل القالب (CSV يفتح في Excel)</span>
+                </a>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">ملف الأسماء</label>
+                <input
+                  key={importKey}
+                  type="file"
+                  accept=".xlsx,.csv"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  الأنواع المدعومة: xlsx أو csv — الحد الأقصى 8 ميجابايت و {MAX_ATTENDEE_NAMES} اسماً.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button type="button" onClick={() => setShowImport(false)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg">
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={handleImport}
+                  disabled={isPending || !importFile}
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                >
+                  استيراد الأسماء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="block font-bold text-slate-700 mb-1">صور / مرفق توثيق الدورة التدريبية (اختياري)</label>
@@ -169,7 +374,7 @@ function ExecutionForm({ training, practitioners }: ExecutionFormProps) {
   );
 }
 
-export function TrainingsView({ user, trainings, hospitals, practitioners }: TrainingsViewProps) {
+export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps) {
   const isCentral = user.role === 'central';
   const { run, isPending } = useActionRunner();
 
@@ -440,7 +645,10 @@ export function TrainingsView({ user, trainings, hospitals, practitioners }: Tra
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px]">عدد الحضور الموثق</span>
-                  <strong className="font-bold text-teal-700 font-mono text-sm">{selectedTraining.attendeeCount} كادر</strong>
+                  <strong className="font-bold text-teal-700 font-mono text-sm">{selectedTraining.attendeeCount} حاضر</strong>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">
+                    {selectedTraining.attendeeNames.length > 0 ? 'مسجل بالأسماء' : 'إجمالي العدد بدون أسماء'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px]">الموعد النهائي</span>
@@ -497,7 +705,7 @@ export function TrainingsView({ user, trainings, hospitals, practitioners }: Tra
                   <span className="text-[11px] bg-teal-50 text-teal-700 font-bold px-2 py-0.5 rounded">توثيق إلكتروني</span>
                 </div>
 
-                <ExecutionForm key={selectedTraining.id} training={selectedTraining} practitioners={practitioners} />
+                <ExecutionForm key={selectedTraining.id} training={selectedTraining} />
               </div>
             </div>
           ) : (

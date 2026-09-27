@@ -182,14 +182,17 @@ model TrainingAttachment {
   @@index([trainingId])
 }
 
+// A row is either one named attendee or the training's total headcount, never both and never
+// neither. Enforced by a CHECK constraint, plus a partial unique index allowing at most one
+// headcount row per training (see migration 20260927000000_attendance_names).
+// Attendance carries no reference to Practitioner — see docs/CLAUDE_REFERENCE.md §8 D-001.
 model TrainingAttendance {
-  id             String  @id @default(cuid())
-  trainingId     String
-  practitionerId String?
-  headcount      Int?
+  id           String  @id @default(cuid())
+  trainingId   String
+  attendeeName String?
+  headcount    Int?
 
-  training     Training      @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  practitioner Practitioner? @relation(fields: [practitionerId], references: [id], onDelete: SetNull)
+  training Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
 
   @@index([trainingId])
 }
@@ -204,8 +207,7 @@ model Practitioner {
   phone         String?
   createdAt     DateTime @default(now())
 
-  hospital    Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
-  attendances TrainingAttendance[]
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
 
   @@index([hospitalId])
 }

@@ -294,7 +294,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
                 <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
                   <span className="flex items-center gap-1 text-emerald-700 font-medium">
                     <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    متاح للربط بالتدريبات المعتمدة
+                    عضو معتمد في فريق مكافحة العدوى
                   </span>
                 </div>
               </div>

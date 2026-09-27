@@ -97,7 +97,8 @@ export interface TrainingDTO {
   notes: string | null;
   status: TrainingStatus;
   attendeeCount: number;
-  attendeePractitionerIds: string[];
+  /** Attendee names as stored, in insertion order; duplicates are preserved deliberately. */
+  attendeeNames: string[];
   attachments: TrainingAttachmentDTO[];
   createdAt: string;
 }
