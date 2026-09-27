@@ -10,6 +10,8 @@ import type {
   TrainingDTO,
   VisitDTO,
 } from '@/lib/types';
+import type { ColumnDef } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate } from '@/lib/format';
 
 interface HospitalProfileViewProps {
@@ -33,6 +35,69 @@ export function HospitalProfileView({
   const hTrainings = trainings.filter((t) => t.hospitalId === hospital.id);
   const hPractitioners = practitioners.filter((p) => p.hospitalId === hospital.id);
   const hEquipments = equipments.filter((e) => e.hospitalId === hospital.id);
+
+  // The two record lists on this screen become narrow tables; the coordinator card, the facility summary
+  // and the four count tiles above them are untouched.
+  const visitColumns: ColumnDef<VisitDTO>[] = [
+    {
+      key: 'visitDate',
+      header: 'تاريخ الزيارة',
+      type: 'date',
+      value: (v) => v.visitDate,
+      render: (v) => <span className="font-bold text-slate-800 whitespace-nowrap">زيارة بتاريخ {formatDate(v.visitDate)}</span>,
+    },
+    { key: 'team', header: 'الفريق الزائر', value: (v) => v.team, render: (v) => <span className="text-[11px] text-slate-500">{v.team}</span> },
+    {
+      key: 'status',
+      header: 'الحالة',
+      align: 'end',
+      value: (v) => (v.status === 'completed' ? 'مكتملة' : 'قيد المتابعة'),
+      render: (v) => (
+        <span
+          className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
+            v.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+          }`}
+        >
+          {v.status === 'completed'
+            ? `مكتملة (${v.complianceScore !== null ? `${v.complianceScore}%` : '—'})`
+            : 'قيد المتابعة'}
+        </span>
+      ),
+    },
+  ];
+
+  const trainingColumns: ColumnDef<TrainingDTO>[] = [
+    { key: 'title', header: 'البرنامج', value: (t) => t.title, render: (t) => <span className="font-bold text-slate-800">{t.title}</span> },
+    {
+      key: 'due',
+      header: 'النوع / الاستحقاق',
+      value: (t) => (t.isInternal ? 'تدريب داخلي' : t.dueDate),
+      render: (t) => (
+        <span className="text-[11px] text-slate-500">
+          {t.isInternal ? 'تدريب داخلي' : `تاريخ الاستحقاق: ${formatDate(t.dueDate)}`}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'الحالة',
+      align: 'end',
+      value: (t) => (t.status === 'completed' ? 'منفذ وموثق' : t.status === 'late' ? 'متأخر' : 'معلق ومستحق'),
+      render: (t) => (
+        <span
+          className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
+            t.status === 'completed'
+              ? 'bg-emerald-100 text-emerald-800'
+              : t.status === 'late'
+                ? 'bg-rose-100 text-rose-800'
+                : 'bg-amber-100 text-amber-800'
+          }`}
+        >
+          {t.status === 'completed' ? 'منفذ وموثق' : t.status === 'late' ? 'متأخر' : 'معلق ومستحق'}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
@@ -183,29 +248,16 @@ export function HospitalProfileView({
               عرض الكل
             </Link>
           </h3>
-          {hVisits.length === 0 ? (
-            <p className="text-xs text-slate-400 py-6 text-center">لا توجد زيارات رقابية مسجلة حالياً للمستشفى</p>
-          ) : (
-            <div className="space-y-2">
-              {hVisits.slice(0, 4).map((v) => (
-                <div key={v.id} className="p-3 bg-slate-50 rounded-lg text-xs flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-slate-800 block">زيارة بتاريخ {formatDate(v.visitDate)}</span>
-                    <span className="text-[11px] text-slate-500">الفريق الزائر: {v.team}</span>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      v.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {v.status === 'completed'
-                      ? `مكتملة (${v.complianceScore !== null ? `${v.complianceScore}%` : '—'})`
-                      : 'قيد المتابعة'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <DataTable
+            rows={hVisits}
+            columns={visitColumns}
+            rowKey={(v) => v.id}
+            pageSize={10}
+            searchPlaceholder="بحث في زيارات المستشفى..."
+            emptyMessage="لا توجد زيارات رقابية مسجلة حالياً للمستشفى"
+            noMatchMessage="لا توجد زيارات مطابقة للبحث"
+            caption="زيارات المستشفى الرقابية"
+          />
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
@@ -218,33 +270,16 @@ export function HospitalProfileView({
               عرض الكل
             </Link>
           </h3>
-          {hTrainings.length === 0 ? (
-            <p className="text-xs text-slate-400 py-6 text-center">لا توجد برامج تدريبية مسجلة حالياً</p>
-          ) : (
-            <div className="space-y-2">
-              {hTrainings.slice(0, 4).map((t) => (
-                <div key={t.id} className="p-3 bg-slate-50 rounded-lg text-xs flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-slate-800 block">{t.title}</span>
-                    <span className="text-[11px] text-slate-500">
-                      {t.isInternal ? 'تدريب داخلي' : `تاريخ الاستحقاق: ${formatDate(t.dueDate)}`}
-                    </span>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      t.status === 'completed'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : t.status === 'late'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {t.status === 'completed' ? 'منفذ وموثق' : t.status === 'late' ? 'متأخر' : 'معلق ومستحق'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <DataTable
+            rows={hTrainings}
+            columns={trainingColumns}
+            rowKey={(t) => t.id}
+            pageSize={10}
+            searchPlaceholder="بحث في البرامج التدريبية..."
+            emptyMessage="لا توجد برامج تدريبية مسجلة حالياً"
+            noMatchMessage="لا توجد برامج مطابقة للبحث"
+            caption="البرامج التدريبية المخصصة للمستشفى"
+          />
         </div>
       </div>
     </div>

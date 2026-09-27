@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Upload, Download, Search, Filter, Network, FileArchive, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Upload, Download, Filter, Network, FileArchive, X } from 'lucide-react';
 import type {
   DocumentCenterFileDTO,
   OrgDocType,
@@ -10,6 +10,8 @@ import type {
   PolicyDTO,
   SessionUser,
 } from '@/lib/types';
+import type { ColumnDef } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate, formatFileSize } from '@/lib/format';
 import { createPolicy } from '@/server/actions/policies';
 import { createOrgDocument } from '@/server/actions/org-documents';
@@ -63,7 +65,6 @@ const META = {
 export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], docCenterItems = [] }: DocumentsViewProps) {
   const isCentral = user.role === 'central';
   const { run, isPending } = useActionRunner();
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | PolicyCategory>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
 
@@ -74,14 +75,118 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
   const [file, setFile] = useState<File | null>(null);
 
   const meta = META[moduleType];
-  const q = searchQuery.toLowerCase();
 
-  const filteredPolicies = policies.filter((p) => {
-    if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
-    return !q || p.title.toLowerCase().includes(q);
+  // The category select keeps narrowing the policy list as before; the table adds search, sort and paging.
+  const scopedPolicies = useMemo(
+    () => policies.filter((p) => selectedCategory === 'all' || p.category === selectedCategory),
+    [policies, selectedCategory],
+  );
+
+  // The download stays a real link, exactly as the cards had it, so target/middle-click behaviour and the
+  // browser's own download handling are unchanged. It therefore lives in a column, not in `actions`.
+  function downloadColumn<T extends { file: { url: string } }>(label: string, tone: string): ColumnDef<T> {
+    return {
+      key: 'download',
+      header: 'الملف',
+      sortable: false,
+      searchable: false,
+      align: 'end',
+      value: () => null,
+      render: (row) => (
+        <a
+          href={row.file.url}
+          target="_blank"
+          rel="noreferrer"
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg font-bold transition-colors text-[11px] ${tone}`}
+        >
+          <Download className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>{label}</span>
+        </a>
+      ),
+    };
+  }
+
+  const sizeColumn = <T extends { file: { size: number } }>(): ColumnDef<T> => ({
+    key: 'size',
+    header: 'حجم الملف',
+    type: 'number',
+    align: 'end',
+    value: (row) => row.file.size,
+    render: (row) => <span className="font-mono text-slate-400">{formatFileSize(row.file.size)}</span>,
+    hideBelowMd: true,
   });
-  const filteredOrgDocs = orgDocs.filter((o) => !q || o.title.toLowerCase().includes(q));
-  const filteredDocCenter = docCenterItems.filter((d) => !q || d.title.toLowerCase().includes(q));
+
+  const uploadedAtColumn = <T extends { uploadedAt: string }>(header: string): ColumnDef<T> => ({
+    key: 'uploadedAt',
+    header,
+    type: 'date',
+    value: (row) => row.uploadedAt,
+    render: (row) => <span className="whitespace-nowrap text-slate-500">{formatDate(row.uploadedAt)}</span>,
+  });
+
+  const policyColumns: ColumnDef<PolicyDTO>[] = [
+    { key: 'title', header: 'عنوان الوثيقة', value: (p) => p.title, render: (p) => <span className="font-bold text-slate-900">{p.title}</span> },
+    {
+      key: 'category',
+      header: 'التصنيف',
+      value: (p) => POLICY_CATEGORY_LABELS[p.category],
+      render: (p) => (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">
+          {POLICY_CATEGORY_LABELS[p.category]}
+        </span>
+      ),
+    },
+    { key: 'version', header: 'الإصدار', value: (p) => p.version, render: (p) => <span className="font-mono text-slate-500">إصدار {p.version}</span> },
+    sizeColumn<PolicyDTO>(),
+    uploadedAtColumn<PolicyDTO>('تاريخ الرفع'),
+    downloadColumn<PolicyDTO>('تحميل الوثيقة', 'hover:bg-teal-50 text-teal-700'),
+  ];
+
+  const orgDocColumns: ColumnDef<OrgDocumentDTO>[] = [
+    {
+      key: 'title',
+      header: 'عنوان الوثيقة',
+      value: (o) => o.title,
+      render: (o) => (
+        <span className="flex items-center gap-2">
+          <Network className="w-3.5 h-3.5 text-indigo-600 shrink-0" aria-hidden="true" />
+          <span className="font-bold text-slate-900">{o.title}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'النوع',
+      value: (o) => ORG_DOC_TYPE_LABELS[o.type],
+      render: (o) => (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">
+          {ORG_DOC_TYPE_LABELS[o.type]}
+        </span>
+      ),
+    },
+    { key: 'uploadedBy', header: 'تم الرفع بواسطة', value: (o) => o.uploadedBy ?? 'الإدارة المركزية' },
+    sizeColumn<OrgDocumentDTO>(),
+    uploadedAtColumn<OrgDocumentDTO>('تاريخ الرفع'),
+    downloadColumn<OrgDocumentDTO>('استعراض وتحميل', 'hover:bg-indigo-50 text-indigo-700'),
+  ];
+
+  const docCenterColumns: ColumnDef<DocumentCenterFileDTO>[] = [
+    {
+      key: 'title',
+      header: 'عنوان الملف',
+      value: (d) => d.title,
+      render: (d) => (
+        <span className="flex items-center gap-2">
+          <FileArchive className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+          <span className="font-bold text-slate-900">{d.title}</span>
+        </span>
+      ),
+    },
+    { key: 'uploadedBy', header: 'تم الرفع بواسطة', value: (d) => d.uploadedBy ?? 'الإدارة المركزية' },
+    sizeColumn<DocumentCenterFileDTO>(),
+    uploadedAtColumn<DocumentCenterFileDTO>('تاريخ الإضافة'),
+    downloadColumn<DocumentCenterFileDTO>('تحميل الملف', 'hover:bg-slate-100 text-slate-700'),
+  ];
 
   const openUploadModal = () => {
     setTitle('');
@@ -145,19 +250,8 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
         )}
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <input
-            type="text"
-            placeholder="بحث في أسماء الملفات، التصنيفات، العناوين..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white"
-          />
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-        </div>
-
-        {moduleType === 'policies' && (
+      {moduleType === 'policies' && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-end gap-4">
           <div className="flex items-center gap-2">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select
@@ -173,135 +267,43 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
               ))}
             </select>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {moduleType === 'policies' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPolicies.length === 0 ? (
-            <div className="col-span-full bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-              لا توجد سياسات مطابقة للبحث
-            </div>
-          ) : (
-            filteredPolicies.map((p) => (
-              <div
-                key={p.id}
-                className="bg-white p-5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs flex flex-col justify-between space-y-4"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
-                      {POLICY_CATEGORY_LABELS[p.category]}
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-400">إصدار {p.version}</span>
-                  </div>
-                  <h3 className="font-bold text-xs text-slate-900 leading-snug">{p.title}</h3>
-                  <p className="text-[10px] text-slate-400 mt-1">تاريخ الرفع: {formatDate(p.uploadedAt)}</p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-slate-400 font-mono">{formatFileSize(p.file.size)}</span>
-                  <a
-                    href={p.file.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-teal-50 text-teal-700 rounded-lg font-bold transition-colors text-[11px]"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>تحميل الوثيقة</span>
-                  </a>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <DataTable
+          rows={scopedPolicies}
+          columns={policyColumns}
+          rowKey={(p) => p.id}
+          searchPlaceholder="بحث في عناوين السياسات والتصنيفات..."
+          emptyMessage="لا توجد سياسات مرفوعة بعد"
+          noMatchMessage="لا توجد سياسات مطابقة للبحث"
+          caption="مكتبة السياسات والإجراءات والنماذج"
+        />
       )}
 
       {moduleType === 'orgDocs' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredOrgDocs.length === 0 ? (
-            <div className="col-span-full bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-              لا توجد وثائق تنظيمية مطابقة
-            </div>
-          ) : (
-            filteredOrgDocs.map((o) => (
-              <div
-                key={o.id}
-                className="bg-white p-5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs flex flex-col justify-between space-y-4"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0">
-                    <Network className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      {ORG_DOC_TYPE_LABELS[o.type]}
-                    </span>
-                    <h3 className="font-bold text-xs text-slate-900 leading-snug mt-1.5">{o.title}</h3>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      تم الرفع بواسطة: {o.uploadedBy ?? 'الإدارة المركزية'} • {formatDate(o.uploadedAt)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-slate-400 font-mono">{formatFileSize(o.file.size)}</span>
-                  <a
-                    href={o.file.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-indigo-50 text-indigo-700 rounded-lg font-bold transition-colors text-[11px]"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>استعراض وتحميل</span>
-                  </a>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <DataTable
+          rows={orgDocs}
+          columns={orgDocColumns}
+          rowKey={(o) => o.id}
+          searchPlaceholder="بحث في عناوين الوثائق التنظيمية..."
+          emptyMessage="لا توجد وثائق تنظيمية مرفوعة بعد"
+          noMatchMessage="لا توجد وثائق تنظيمية مطابقة"
+          caption="الهيكل التنظيمي والوصف الوظيفي"
+        />
       )}
 
       {moduleType === 'docCenter' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDocCenter.length === 0 ? (
-            <div className="col-span-full bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-              لا توجد ملفات في المستودع العام
-            </div>
-          ) : (
-            filteredDocCenter.map((d) => (
-              <div
-                key={d.id}
-                className="bg-white p-5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs flex flex-col justify-between space-y-4"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shrink-0">
-                    <FileArchive className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xs text-slate-900 leading-snug">{d.title}</h3>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      تم الرفع بواسطة: {d.uploadedBy ?? 'الإدارة المركزية'} • {formatDate(d.uploadedAt)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-slate-400 font-mono">{formatFileSize(d.file.size)}</span>
-                  <a
-                    href={d.file.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg font-bold transition-colors text-[11px]"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>تحميل الملف</span>
-                  </a>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <DataTable
+          rows={docCenterItems}
+          columns={docCenterColumns}
+          rowKey={(d) => d.id}
+          searchPlaceholder="بحث في عناوين ملفات المستودع..."
+          emptyMessage="لا توجد ملفات في المستودع العام"
+          noMatchMessage="لا توجد ملفات مطابقة للبحث"
+          caption="مركز الوثائق العام"
+        />
       )}
 
       {isCentral && showUploadModal && (

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, Filter, FileSpreadsheet } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Filter, FileSpreadsheet } from 'lucide-react';
 import type { AuditLogDTO } from '@/lib/types';
+import type { ColumnDef } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDateTime } from '@/lib/format';
 
 interface AuditViewProps {
@@ -29,21 +31,56 @@ function csvCell(value: string): string {
 }
 
 export function AuditView({ auditLogs }: AuditViewProps) {
-  const [searchQuery, setSearchQuery] = useState('');
   const [filterEntity, setFilterEntity] = useState('all');
 
-  const filteredLogs = auditLogs.filter((log) => {
-    if (filterEntity !== 'all' && log.entityType !== filterEntity) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        log.action.toLowerCase().includes(q) ||
-        log.performedBy.toLowerCase().includes(q) ||
-        log.entityType.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  // The entity select keeps narrowing the log as before; the table adds search, sort and paging.
+  const scopedLogs = useMemo(
+    () => auditLogs.filter((log) => filterEntity === 'all' || log.entityType === filterEntity),
+    [auditLogs, filterEntity],
+  );
+
+  // R-007: export the filtered-and-sorted set the user is looking at — not the raw array, and not just
+  // the current page. Mirrored from the table so the two can never disagree.
+  const [filteredLogs, setFilteredLogs] = useState<AuditLogDTO[]>(scopedLogs);
+
+  const auditColumns: ColumnDef<AuditLogDTO>[] = [
+    {
+      key: 'entityType',
+      header: 'نوع الكيان',
+      value: (log) => log.entityType,
+      render: (log) => (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200 whitespace-nowrap">
+          {log.entityType}
+        </span>
+      ),
+    },
+    {
+      key: 'action',
+      header: 'الإجراء المنفذ',
+      value: (log) => log.action,
+      render: (log) => <span className="font-medium text-slate-900">{log.action}</span>,
+    },
+    {
+      key: 'performedBy',
+      header: 'المنفذ',
+      value: (log) => log.performedBy,
+      render: (log) => <span className="font-semibold text-teal-800">{log.performedBy}</span>,
+    },
+    {
+      key: 'timestamp',
+      header: 'التاريخ والتوقيت',
+      type: 'date',
+      value: (log) => log.timestamp,
+      render: (log) => <span className="font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatDateTime(log.timestamp)}</span>,
+    },
+    {
+      key: 'entityId',
+      header: 'معرف الكيان',
+      value: (log) => log.entityId,
+      render: (log) => <span className="font-mono text-[10px] text-slate-400">#{log.entityId.slice(0, 10)}</span>,
+      hideBelowMd: true,
+    },
+  ];
 
   const handleExportLogs = () => {
     const headers = ['المعرف', 'نوع الكيان', 'معرف الكيان', 'الإجراء المنفذ', 'المستخدم', 'التاريخ والوقت'];
@@ -72,7 +109,7 @@ export function AuditView({ auditLogs }: AuditViewProps) {
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             سجل تدقيق العمليات الرقابية والتوثيق
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
-              {auditLogs.length} عملية معروضة
+              {filteredLogs.length} عملية معروضة
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -90,18 +127,7 @@ export function AuditView({ auditLogs }: AuditViewProps) {
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <input
-            type="text"
-            placeholder="بحث في الإجراءات، أسماء المستخدمين، نوع الكيان..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white"
-          />
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-        </div>
-
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-end gap-4">
         <div className="flex items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <select
@@ -119,46 +145,16 @@ export function AuditView({ auditLogs }: AuditViewProps) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-slate-100/80 text-slate-600 border-b border-slate-200 font-semibold">
-              <tr>
-                <th className="py-3.5 px-4">نوع الكيان</th>
-                <th className="py-3.5 px-4">الإجراء المنفذ</th>
-                <th className="py-3.5 px-4">المنفذ</th>
-                <th className="py-3.5 px-4">التاريخ والتوقيت</th>
-                <th className="py-3.5 px-4">معرف الكيان</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
-                    لا توجد سجلات مطابقة للفلتر المحدد
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                        {log.entityType}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-medium text-slate-900">{log.action}</td>
-                    <td className="py-3 px-4">
-                      <span className="font-semibold text-teal-800">{log.performedBy}</span>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500">{formatDateTime(log.timestamp)}</td>
-                    <td className="py-3 px-4 font-mono text-[10px] text-slate-400">#{log.entityId.slice(0, 10)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        rows={scopedLogs}
+        columns={auditColumns}
+        rowKey={(log) => log.id}
+        onStateChange={({ filteredRows }) => setFilteredLogs(filteredRows)}
+        searchPlaceholder="بحث في الإجراءات، أسماء المستخدمين، نوع الكيان..."
+        emptyMessage="لا توجد عمليات مسجلة في سجل التدقيق"
+        noMatchMessage="لا توجد سجلات مطابقة للفلتر المحدد"
+        caption="سجل تدقيق العمليات"
+      />
     </div>
   );
 }

@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   GraduationCap,
   Plus,
   Clock,
-  Search,
   Users,
   X,
   FileCheck,
@@ -16,6 +15,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { HospitalDTO, SessionUser, TrainingDTO } from '@/lib/types';
+import type { ColumnDef } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate, todayInputValue } from '@/lib/format';
 import { ATTENDEE_NAME_MAX_LENGTH, MAX_ATTENDEE_NAMES, type ImportSummary } from '@/lib/attendance';
 import {
@@ -379,7 +380,7 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
   const { run, isPending } = useActionRunner();
 
   const [selectedTrainingId, setSelectedTrainingId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [tableState, setTableState] = useState<{ ids: string[]; count: number } | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterHospital, setFilterHospital] = useState<string>('');
@@ -398,23 +399,87 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
   const [internalDeliveredBy, setInternalDeliveredBy] = useState('');
   const [internalCount, setInternalCount] = useState('');
 
-  const filteredTrainings = trainings.filter((t) => {
-    if (filterType === 'central' && t.isInternal) return false;
-    if (filterType === 'internal' && !t.isInternal) return false;
-    if (filterStatus !== 'all' && t.status !== filterStatus) return false;
-    if (isCentral && filterHospital && t.hospitalId !== filterHospital) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        t.title.toLowerCase().includes(q) ||
-        t.hospitalName.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  // The three selects keep filtering here exactly as before; the table adds search, sort and paging.
+  const scopedTrainings = useMemo(
+    () =>
+      trainings.filter((t) => {
+        if (filterType === 'central' && t.isInternal) return false;
+        if (filterType === 'internal' && !t.isInternal) return false;
+        if (filterStatus !== 'all' && t.status !== filterStatus) return false;
+        if (isCentral && filterHospital && t.hospitalId !== filterHospital) return false;
+        return true;
+      }),
+    [trainings, filterType, filterStatus, filterHospital, isCentral],
+  );
 
-  const selectedTraining = filteredTrainings.find((t) => t.id === selectedTrainingId) ?? filteredTrainings[0];
+  const trainingColumns = useMemo<ColumnDef<TrainingDTO>[]>(
+    () => [
+      { key: 'title', header: 'عنوان الدورة', value: (t) => t.title },
+      { key: 'hospitalName', header: 'المستشفى', value: (t) => t.hospitalName },
+      {
+        key: 'kind',
+        header: 'النوع',
+        value: (t) => (t.isInternal ? 'تدريب داخلي' : 'مركزي إلزامي'),
+        render: (t) => (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap">
+            {t.isInternal ? 'تدريب داخلي' : 'مركزي إلزامي'}
+          </span>
+        ),
+        hideBelowMd: true,
+      },
+      {
+        key: 'status',
+        header: 'الحالة',
+        value: (t) => (t.status === 'completed' ? 'مكتمل وموثق' : t.status === 'late' ? 'متأخر (تجاوز الموعد)' : 'معلّق بالانتظار'),
+        render: (t) => (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadgeClass(t.status)}`}>
+            {t.status === 'completed' ? 'مكتمل وموثق' : t.status === 'late' ? 'متأخر (تجاوز الموعد)' : 'معلّق بالانتظار'}
+          </span>
+        ),
+      },
+      {
+        key: 'attendeeCount',
+        header: 'الحاضرون',
+        type: 'number',
+        align: 'end',
+        value: (t) => t.attendeeCount,
+        render: (t) => <span className="font-mono whitespace-nowrap">{t.attendeeCount} حاضر</span>,
+      },
+      {
+        key: 'dueDate',
+        header: 'الموعد النهائي',
+        type: 'date',
+        value: (t) => t.dueDate,
+        render: (t) => <span className="whitespace-nowrap">{t.dueDate ? formatDate(t.dueDate) : 'مفتوح'}</span>,
+        hideBelowMd: true,
+      },
+      {
+        // The cards showed the description, so it stays visible and searchable (FR-023).
+        key: 'description',
+        header: 'المحتوى',
+        sortable: false,
+        value: (t) => t.description,
+        render: (t) => (
+          <span className="block max-w-[16rem] truncate text-slate-600" title={t.description}>
+            {t.description}
+          </span>
+        ),
+        hideBelowMd: true,
+      },
+    ],
+    [],
+  );
+
+  const handleTableState = useCallback(
+    ({ filteredRows, filteredCount }: { filteredRows: TrainingDTO[]; filteredCount: number }) =>
+      setTableState({ ids: filteredRows.map((t) => t.id), count: filteredCount }),
+    [],
+  );
+
+  const selectedTraining = trainings.find((t) => t.id === selectedTrainingId);
+  const selectionFilteredOut =
+    Boolean(selectedTraining) && tableState !== null && !tableState.ids.includes(selectedTrainingId);
+  const visibleCount = tableState?.count ?? scopedTrainings.length;
 
   const handleTemplateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -463,7 +528,7 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             إدارة البرامج والدورات التدريبية
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
-              {filteredTrainings.length} دورة مسجلة
+              {visibleCount} دورة مسجلة
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -498,18 +563,9 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-5 space-y-3">
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2.5">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="بحث في الدورات، المستشفيات، المحتوى..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white"
-              />
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-            </div>
-
-            <div className="flex items-center gap-2">
+            {/* Three selects cannot shrink below their intrinsic width, so they wrap instead of pushing the
+                page into a horizontal scroll at phone widths (FR-015). */}
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -548,62 +604,22 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
             </div>
           </div>
 
-          <div className="space-y-2.5 max-h-[750px] overflow-y-auto">
-            {filteredTrainings.length === 0 ? (
-              <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-                لا توجد تدريبات مطابقة
-              </div>
-            ) : (
-              filteredTrainings.map((t) => {
-                const isSel = t.id === selectedTraining?.id;
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => setSelectedTrainingId(t.id)}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                      isSel
-                        ? 'bg-teal-50/50 border-teal-500 shadow-sm ring-1 ring-teal-500'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h4 className="font-bold text-xs text-slate-900 leading-tight">{t.title}</h4>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${statusBadgeClass(t.status)}`}>
-                        {t.status === 'completed' ? 'مكتمل وموثق' : t.status === 'late' ? 'متأخر (تجاوز الموعد)' : 'معلّق بالانتظار'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-2">
-                      <span className="font-semibold text-slate-700">{t.hospitalName}</span>
-                      <span>•</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                        {t.isInternal ? 'تدريب داخلي' : 'مركزي إلزامي'}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{t.description}</p>
-
-                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-slate-400" />
-                        {t.attendeeCount} حاضر
-                      </span>
-                      {t.dueDate && (
-                        <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          الموعد: {formatDate(t.dueDate)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <DataTable
+            rows={scopedTrainings}
+            columns={trainingColumns}
+            rowKey={(t) => t.id}
+            onRowSelect={(t) => setSelectedTrainingId(t.id)}
+            selectedRowKey={selectedTrainingId}
+            onStateChange={handleTableState}
+            searchPlaceholder="بحث في الدورات، المستشفيات، المحتوى..."
+            emptyMessage="لا توجد دورات تدريبية مسجلة بعد"
+            noMatchMessage="لا توجد تدريبات مطابقة"
+            caption="سجل الدورات التدريبية"
+          />
         </div>
 
         <div className="lg:col-span-7">
-          {selectedTraining ? (
+          {selectedTraining && !selectionFilteredOut ? (
             <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden p-6 space-y-6">
               <div className="pb-5 border-b border-slate-200">
                 <div className="flex items-center gap-2 mb-2">
@@ -707,6 +723,11 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
 
                 <ExecutionForm key={selectedTraining.id} training={selectedTraining} />
               </div>
+            </div>
+          ) : selectionFilteredOut ? (
+            <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-500 text-xs">
+              الدورة المحددة غير مطابقة للفلتر أو البحث الحالي. أعد تعيين الفلتر أو اختر دورة من القائمة
+              لاستعراض تفاصيلها.
             </div>
           ) : (
             <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">

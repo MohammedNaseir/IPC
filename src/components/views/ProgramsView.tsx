@@ -1,8 +1,10 @@
 'use client';
 
-import { Fragment, useState } from 'react';
-import { FolderPlus, Folder, FileText, Upload, Download, ChevronRight, ArrowLeft, X } from 'lucide-react';
+import { Fragment, useMemo, useState } from 'react';
+import { FolderPlus, Folder, FileText, Upload, Download, ChevronRight, ArrowLeft, FolderOpen, X } from 'lucide-react';
 import type { ProgramFileDTO, ProgramNodeDTO, SessionUser } from '@/lib/types';
+import type { ColumnDef, RowAction } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate, formatFileSize } from '@/lib/format';
 import { createProgramNode, uploadProgramFile } from '@/server/actions/programs';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
@@ -12,6 +14,11 @@ interface ProgramsViewProps {
   nodes: ProgramNodeDTO[];
   files: ProgramFileDTO[];
 }
+
+// One row type for the two kinds of node the explorer shows at a given level.
+type ProgramRow =
+  | { kind: 'folder'; id: string; name: string; node: ProgramNodeDTO; childFolders: number; childFiles: number }
+  | { kind: 'file'; id: string; name: string; item: ProgramFileDTO };
 
 const FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.pptx,.csv';
 
@@ -42,6 +49,121 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
 
   const subNodes = nodes.filter((n) => n.parentId === activeNodeId);
   const currentFiles = activeNodeId ? files.filter((f) => f.parentId === activeNodeId) : [];
+
+  // R-009: the table lists the current node's contents — folders first, then files — so navigation keeps
+  // its meaning. Drilling in, the breadcrumb and the back affordance are unchanged.
+  const contents = useMemo<ProgramRow[]>(
+    () => [
+      ...subNodes.map<ProgramRow>((node) => ({
+        kind: 'folder',
+        id: node.id,
+        name: node.name,
+        node,
+        childFolders: nodes.filter((n) => n.parentId === node.id).length,
+        childFiles: files.filter((f) => f.parentId === node.id).length,
+      })),
+      ...currentFiles.map<ProgramRow>((item) => ({ kind: 'file', id: item.id, name: item.name, item })),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nodes, files, activeNodeId],
+  );
+
+  const [shown, setShown] = useState<ProgramRow[] | null>(null);
+  const rowsShown = shown ?? contents;
+  const foldersShown = rowsShown.filter((r) => r.kind === 'folder').length;
+  const filesShown = rowsShown.filter((r) => r.kind === 'file').length;
+
+  const contentColumns: ColumnDef<ProgramRow>[] = [
+    {
+      key: 'kind',
+      header: 'النوع',
+      value: (row) => (row.kind === 'folder' ? 'مجلد' : 'ملف'),
+      render: (row) =>
+        row.kind === 'folder' ? (
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">
+            <Folder className="w-3 h-3" aria-hidden="true" />
+            مجلد
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+            <FileText className="w-3 h-3" aria-hidden="true" />
+            ملف
+          </span>
+        ),
+    },
+    {
+      key: 'name',
+      header: 'الاسم',
+      value: (row) => row.name,
+      render: (row) => <span className="font-bold text-slate-900">{row.name}</span>,
+    },
+    {
+      key: 'details',
+      header: 'التفاصيل',
+      sortable: false,
+      value: (row) =>
+        row.kind === 'folder' ? row.node.description : `${formatFileSize(row.item.file.size)}`,
+      render: (row) =>
+        row.kind === 'folder' ? (
+          <span className="block">
+            {row.node.description && <span className="block text-slate-600 max-w-[18rem] truncate">{row.node.description}</span>}
+            <span className="text-[10px] text-slate-400">
+              {row.childFolders} مجلد فرعي • {row.childFiles} ملف
+            </span>
+          </span>
+        ) : (
+          <span className="font-mono text-slate-500">{formatFileSize(row.item.file.size)}</span>
+        ),
+    },
+    {
+      key: 'uploadedAt',
+      header: 'تاريخ الإضافة',
+      type: 'date',
+      value: (row) => (row.kind === 'file' ? row.item.uploadedAt : null),
+      render: (row) =>
+        row.kind === 'file' ? (
+          <span className="whitespace-nowrap text-slate-500">{formatDate(row.item.uploadedAt)}</span>
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
+      hideBelowMd: true,
+    },
+    {
+      key: 'download',
+      header: 'الملف',
+      sortable: false,
+      searchable: false,
+      align: 'end',
+      value: () => null,
+      render: (row) =>
+        row.kind === 'file' ? (
+          <a
+            href={row.item.file.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-teal-50 text-teal-700 rounded-lg text-[11px] font-bold transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>تحميل</span>
+          </a>
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
+    },
+  ];
+
+  const contentActions: RowAction<ProgramRow>[] = [
+    {
+      label: 'فتح المجلد',
+      icon: FolderOpen,
+      tone: 'primary',
+      isAvailable: (row) => row.kind === 'folder',
+      onSelect: (row) => {
+        setShown(null);
+        setCurrentNodeId(row.id);
+      },
+    },
+  ];
 
   const openFolderModal = () => {
     setFolderName('');
@@ -121,7 +243,10 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs overflow-x-auto">
           <button
-            onClick={() => setCurrentNodeId(null)}
+            onClick={() => {
+              setShown(null);
+              setCurrentNodeId(null);
+            }}
             className={`font-bold transition-colors ${
               activeNodeId === null ? 'text-teal-700 underline' : 'text-slate-500 hover:text-slate-800'
             }`}
@@ -133,7 +258,10 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
             <Fragment key={crumb.id}>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400 rotate-180 shrink-0" />
               <button
-                onClick={() => setCurrentNodeId(crumb.id)}
+                onClick={() => {
+                  setShown(null);
+                  setCurrentNodeId(crumb.id);
+                }}
                 className={`font-medium transition-colors ${
                   idx === breadcrumbs.length - 1 ? 'text-teal-700 font-bold' : 'text-slate-500 hover:text-slate-800'
                 }`}
@@ -146,7 +274,10 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
 
         {currentNode && (
           <button
-            onClick={() => setCurrentNodeId(currentNode.parentId)}
+            onClick={() => {
+              setShown(null);
+              setCurrentNodeId(currentNode.parentId);
+            }}
             className="flex items-center gap-1 text-xs text-slate-600 hover:text-teal-700 font-medium px-2 py-1 rounded bg-slate-50 hover:bg-slate-100"
           >
             <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
@@ -155,93 +286,24 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
         )}
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">
-            المجلدات والبرامج ({subNodes.length})
-          </h4>
+      <div className="space-y-3">
+        <h4 className="text-xs font-bold text-slate-500 uppercase">
+          محتويات هذا المستوى ({foldersShown} مجلد • {filesShown} ملف)
+        </h4>
 
-          {subNodes.length === 0 && currentFiles.length === 0 ? (
-            <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-              هذا المجلد فارغ حالياً
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {subNodes.map((node) => {
-                const childFiles = files.filter((f) => f.parentId === node.id);
-                const childNodes = nodes.filter((n) => n.parentId === node.id);
-
-                return (
-                  <div
-                    key={node.id}
-                    onClick={() => setCurrentNodeId(node.id)}
-                    className="bg-white p-4 rounded-xl border border-slate-200 hover:border-teal-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-teal-50 group-hover:bg-teal-600 border border-teal-100 flex items-center justify-center text-teal-600 group-hover:text-white transition-colors shrink-0">
-                        <Folder className="w-5 h-5" />
-                      </div>
-                      <div className="overflow-hidden">
-                        <h4 className="font-bold text-xs text-slate-900 group-hover:text-teal-800 transition-colors truncate">
-                          {node.name}
-                        </h4>
-                        {node.description && (
-                          <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{node.description}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                      <span>{childNodes.length} مجلد فرعي</span>
-                      <span>{childFiles.length} ملف</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {currentFiles.length > 0 && (
-          <div className="pt-4">
-            <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">
-              الملفات والمستندات في هذا المجلد ({currentFiles.length})
-            </h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentFiles.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs flex flex-col justify-between space-y-3"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div className="overflow-hidden">
-                      <h5 className="font-bold text-xs text-slate-900 leading-snug truncate">{item.name}</h5>
-                      <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
-                        {formatFileSize(item.file.size)} • {formatDate(item.uploadedAt)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
-                    <a
-                      href={item.file.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-teal-50 text-teal-700 rounded-lg text-xs font-bold transition-colors"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>تحميل</span>
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <DataTable
+          // Remounting per node resets sort, search and paging for the new folder (R-009).
+          key={activeNodeId ?? 'root'}
+          rows={contents}
+          columns={contentColumns}
+          rowKey={(row) => row.id}
+          actions={contentActions}
+          onStateChange={({ filteredRows }) => setShown(filteredRows)}
+          searchPlaceholder="بحث في أسماء المجلدات والملفات..."
+          emptyMessage="هذا المجلد فارغ حالياً"
+          noMatchMessage="لا توجد عناصر مطابقة للبحث"
+          caption="محتويات البرنامج الحالي"
+        />
       </div>
 
       {isCentral && showFolderModal && (

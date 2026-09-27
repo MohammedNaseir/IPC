@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Plus,
   FileText,
@@ -10,7 +10,6 @@ import {
   Lock,
   Calendar,
   Users,
-  Search,
   CheckCircle,
   Download,
   Upload,
@@ -20,6 +19,8 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import type { AuditLogDTO, HospitalDTO, SessionUser, VisitDTO } from '@/lib/types';
+import type { ColumnDef } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate, formatDateTime, formatFileSize, todayInputValue } from '@/lib/format';
 import {
   addVisitAttachment,
@@ -46,7 +47,8 @@ export function VisitsView({ user, visits, hospitals, auditLogs }: VisitsViewPro
   const [selectedVisitId, setSelectedVisitId] = useState<string>(visits[0]?.id ?? '');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterHospital, setFilterHospital] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  // Mirrors the table's filtered set so the heading count and the detail panel agree with the rows shown.
+  const [tableState, setTableState] = useState<{ ids: string[]; count: number } | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -65,21 +67,104 @@ export function VisitsView({ user, visits, hospitals, auditLogs }: VisitsViewPro
   const [attFile, setAttFile] = useState<File | null>(null);
   const [repFile, setRepFile] = useState<File | null>(null);
 
-  const filteredVisits = visits.filter((v) => {
-    if (filterStatus !== 'all' && v.status !== filterStatus) return false;
-    if (isCentral && filterHospital && v.hospitalId !== filterHospital) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        v.hospitalName.toLowerCase().includes(q) ||
-        v.team.toLowerCase().includes(q) ||
-        v.details.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  // The two selects keep filtering here, exactly as before; the table adds search, sort and paging on top.
+  const scopedVisits = useMemo(
+    () =>
+      visits.filter((v) => {
+        if (filterStatus !== 'all' && v.status !== filterStatus) return false;
+        if (isCentral && filterHospital && v.hospitalId !== filterHospital) return false;
+        return true;
+      }),
+    [visits, filterStatus, filterHospital, isCentral],
+  );
 
-  const selectedVisit = filteredVisits.find((v) => v.id === selectedVisitId) ?? filteredVisits[0];
+  const visitColumns = useMemo<ColumnDef<VisitDTO>[]>(
+    () => [
+      { key: 'hospitalName', header: 'المستشفى', value: (v) => v.hospitalName },
+      {
+        key: 'visitDate',
+        header: 'تاريخ الزيارة',
+        type: 'date',
+        value: (v) => v.visitDate,
+        render: (v) => <span className="whitespace-nowrap">{formatDate(v.visitDate)}</span>,
+      },
+      { key: 'team', header: 'الفريق الزائر', value: (v) => v.team },
+      {
+        key: 'status',
+        header: 'الحالة',
+        value: (v) => (v.status === 'completed' ? 'مكتمل ومؤرشف' : 'قيد المتابعة'),
+        render: (v) => (
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+              v.status === 'completed'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border border-amber-200'
+            }`}
+          >
+            {v.status === 'completed' ? 'مكتمل ومؤرشف' : 'قيد المتابعة'}
+          </span>
+        ),
+      },
+      {
+        key: 'complianceScore',
+        header: 'الامتثال',
+        type: 'number',
+        align: 'end',
+        value: (v) => v.complianceScore,
+        render: (v) =>
+          v.complianceScore === null ? (
+            <span className="text-slate-300">—</span>
+          ) : (
+            <span className="font-mono font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded whitespace-nowrap">
+              {v.complianceScore}%
+            </span>
+          ),
+        hideBelowMd: true,
+      },
+      {
+        key: 'attachments',
+        header: 'المرفقات',
+        type: 'number',
+        align: 'end',
+        value: (v) => v.attachments.length,
+        hideBelowMd: true,
+      },
+      {
+        key: 'responses',
+        header: 'ردود المستشفى',
+        type: 'number',
+        align: 'end',
+        value: (v) => v.responses.length,
+        hideBelowMd: true,
+      },
+      {
+        // The cards showed the details text, so it stays visible and searchable (FR-023).
+        key: 'details',
+        header: 'التفاصيل',
+        sortable: false,
+        value: (v) => v.details,
+        render: (v) => (
+          <span className="block max-w-[16rem] truncate text-slate-600" title={v.details}>
+            {v.details}
+          </span>
+        ),
+        hideBelowMd: true,
+      },
+    ],
+    [],
+  );
+
+  const handleTableState = useCallback(
+    ({ filteredRows, filteredCount }: { filteredRows: VisitDTO[]; filteredCount: number }) =>
+      setTableState({ ids: filteredRows.map((v) => v.id), count: filteredCount }),
+    [],
+  );
+
+  const selectedVisit = visits.find((v) => v.id === selectedVisitId);
+  // FR-021: a selection the current filter excludes is reported, never shown as stale detail.
+  const selectionFilteredOut =
+    Boolean(selectedVisit) && tableState !== null && !tableState.ids.includes(selectedVisitId);
+  const visibleCount = tableState?.count ?? scopedVisits.length;
 
   const visitAuditLogs = auditLogs.filter(
     (log) => log.entityType === 'Visit' && log.entityId === selectedVisit?.id,
@@ -179,7 +264,7 @@ export function VisitsView({ user, visits, hospitals, auditLogs }: VisitsViewPro
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             سجل الزيارات والتدقيق الميداني
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
-              {filteredVisits.length} زيارة مسجلة
+              {visibleCount} زيارة مسجلة
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -204,17 +289,6 @@ export function VisitsView({ user, visits, hospitals, auditLogs }: VisitsViewPro
         {/* List of Visits */}
         <div className="lg:col-span-5 space-y-3 no-print">
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2.5">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="بحث في الزيارات، المستشفيات، الفريق..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white text-slate-800"
-              />
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-            </div>
-
             <div className="flex items-center gap-2">
               <select
                 value={filterStatus}
@@ -243,69 +317,23 @@ export function VisitsView({ user, visits, hospitals, auditLogs }: VisitsViewPro
             </div>
           </div>
 
-          <div className="space-y-2.5 max-h-[750px] overflow-y-auto">
-            {filteredVisits.length === 0 ? (
-              <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-                لا توجد زيارات مطابقة للفلتر المحدد
-              </div>
-            ) : (
-              filteredVisits.map((v) => {
-                const isSel = v.id === selectedVisit?.id;
-                return (
-                  <div
-                    key={v.id}
-                    onClick={() => setSelectedVisitId(v.id)}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                      isSel
-                        ? 'bg-teal-50/50 border-teal-500 shadow-sm ring-1 ring-teal-500'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h4 className="font-bold text-xs text-slate-900 leading-tight">{v.hospitalName}</h4>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                          v.status === 'completed'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
-                      >
-                        {v.status === 'completed' ? 'مكتمل ومؤرشف' : 'قيد المتابعة'}
-                      </span>
-                    </div>
-
-                    <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mb-2">
-                      <Calendar className="w-3 h-3 text-slate-400" />
-                      <span>{formatDate(v.visitDate)}</span>
-                    </p>
-
-                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{v.details}</p>
-
-                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <Paperclip className="w-3 h-3 text-slate-400" />
-                        {v.attachments.length} مرفق
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3 text-slate-400" />
-                        {v.responses.length} رد من المستشفى
-                      </span>
-                      {v.complianceScore !== null && (
-                        <span className="font-mono font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
-                          {v.complianceScore}% امتثال
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <DataTable
+            rows={scopedVisits}
+            columns={visitColumns}
+            rowKey={(v) => v.id}
+            onRowSelect={(v) => setSelectedVisitId(v.id)}
+            selectedRowKey={selectedVisitId}
+            onStateChange={handleTableState}
+            searchPlaceholder="بحث في الزيارات، المستشفيات، الفريق..."
+            emptyMessage="لا توجد زيارات رقابية مسجلة بعد"
+            noMatchMessage="لا توجد زيارات مطابقة للفلتر المحدد"
+            caption="سجل الزيارات الرقابية"
+          />
         </div>
 
         {/* Detail View */}
         <div className="lg:col-span-7">
-          {selectedVisit ? (
+          {selectedVisit && !selectionFilteredOut ? (
             <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden space-y-6 p-6">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-200">
                 <div>
@@ -577,6 +605,11 @@ export function VisitsView({ user, visits, hospitals, auditLogs }: VisitsViewPro
                   )}
                 </div>
               </div>
+            </div>
+          ) : selectionFilteredOut ? (
+            <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-500 text-xs">
+              الزيارة المحددة غير مطابقة للفلتر أو البحث الحالي. أعد تعيين الفلتر أو اختر زيارة من القائمة
+              لاستعراض تفاصيلها.
             </div>
           ) : (
             <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">

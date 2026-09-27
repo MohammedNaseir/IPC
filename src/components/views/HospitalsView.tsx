@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Building2,
   Plus,
   Edit2,
   Power,
-  Search,
   Users,
   Wrench,
   ClipboardList,
@@ -26,6 +25,8 @@ import {
   UserPlus,
 } from 'lucide-react';
 import type { EquipmentDTO, HospitalDTO, PractitionerDTO, TrainingDTO, VisitDTO } from '@/lib/types';
+import type { ColumnDef, RowAction } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate } from '@/lib/format';
 import {
   addCoordinator,
@@ -55,7 +56,6 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
   const { run, isPending } = useActionRunner();
 
   const [activeSubTab, setActiveSubTab] = useState<'hospitals' | 'coordinators'>('hospitals');
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingHospital, setEditingHospital] = useState<HospitalDTO | null>(null);
@@ -200,17 +200,283 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
     );
   };
 
-  const term = searchTerm.trim();
-  const filteredHospitals = hospitals.filter(
-    (h) =>
-      !term ||
-      h.name.includes(term) ||
-      h.location.includes(term) ||
-      (h.coordinator?.name.includes(term) ?? false) ||
-      (h.coordinator?.email.includes(term) ?? false),
-  );
-
   const coordinatorsCount = hospitals.filter((h) => h.coordinator).length;
+  // FR-006/R-008: the heading reports what the hospitals table currently shows, not the raw total.
+  const [hospitalsShown, setHospitalsShown] = useState<number | null>(null);
+
+  // Counted once per render rather than per row, since both tables read them.
+  const countsByHospital = useMemo(() => {
+    const empty = () => ({ visits: 0, trainings: 0, practitioners: 0, equipments: 0 });
+    const map = new Map<string, ReturnType<typeof empty>>(hospitals.map((h) => [h.id, empty()]));
+    for (const v of visits) {
+      const entry = map.get(v.hospitalId);
+      if (entry) entry.visits++;
+    }
+    for (const t of trainings) {
+      const entry = map.get(t.hospitalId);
+      if (entry) entry.trainings++;
+    }
+    for (const pr of practitioners) {
+      const entry = map.get(pr.hospitalId);
+      if (entry) entry.practitioners++;
+    }
+    for (const e of equipments) {
+      const entry = map.get(e.hospitalId);
+      if (entry) entry.equipments++;
+    }
+    return map;
+  }, [hospitals, visits, trainings, practitioners, equipments]);
+
+  type CountKey = 'visits' | 'trainings' | 'practitioners' | 'equipments';
+  const countOf = (hospitalId: string, key: CountKey) => countsByHospital.get(hospitalId)?.[key] ?? 0;
+
+  const countColumn = (key: CountKey, header: string): ColumnDef<HospitalDTO> => ({
+    key,
+    header,
+    type: 'number',
+    align: 'end',
+    value: (h) => countOf(h.id, key),
+    render: (h) => <span className="font-mono font-bold text-slate-800">{countOf(h.id, key)}</span>,
+    hideBelowMd: true,
+  });
+
+  const hospitalColumns: ColumnDef<HospitalDTO>[] = [
+    {
+      key: 'name',
+      header: 'المستشفى',
+      value: (h) => h.name,
+      render: (h) => (
+        <span className="flex items-center gap-2">
+          <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" aria-hidden="true" />
+          <span className="font-bold text-slate-900">{h.name}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'نوع المنشأة',
+      value: (h) => h.type,
+      render: (h) => <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium whitespace-nowrap">{h.type}</span>,
+    },
+    {
+      key: 'location',
+      header: 'الموقع',
+      value: (h) => h.location,
+      render: (h) => (
+        <span className="flex items-center gap-1 text-slate-500">
+          <MapPin className="w-3 h-3 shrink-0" aria-hidden="true" />
+          {h.location}
+        </span>
+      ),
+    },
+    {
+      key: 'coordinator',
+      header: 'المنسق',
+      value: (h) => h.coordinator?.name ?? null,
+      render: (h) =>
+        h.coordinator ? (
+          <span className="flex items-center gap-1.5">
+            <UserCheck className="w-3.5 h-3.5 text-teal-600 shrink-0" aria-hidden="true" />
+            <span>{h.coordinator.name}</span>
+          </span>
+        ) : (
+          <span className="text-slate-400">لم يتم التعيين بعد</span>
+        ),
+    },
+    countColumn('visits', 'الزيارات'),
+    countColumn('trainings', 'التدريبات'),
+    countColumn('practitioners', 'الممارسون'),
+    countColumn('equipments', 'الأجهزة'),
+    {
+      key: 'status',
+      header: 'الحالة',
+      value: (h) => (h.isActive ? 'مفعل ويعمل بكفاءة' : 'معطل مؤقتاً'),
+      render: (h) => (
+        <span
+          className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+            h.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+          }`}
+        >
+          {h.isActive ? 'مفعل ويعمل بكفاءة' : 'معطل مؤقتاً'}
+        </span>
+      ),
+    },
+  ];
+
+  const coordinatorColumns: ColumnDef<HospitalDTO>[] = [
+    {
+      key: 'coordinatorName',
+      header: 'المنسق',
+      value: (h) => h.coordinator?.name ?? null,
+      render: (h) =>
+        h.coordinator ? (
+          <span className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-[10px] shrink-0">
+              {h.coordinator.name.charAt(0)}
+            </span>
+            <span className="font-bold text-slate-900">{h.coordinator.name}</span>
+          </span>
+        ) : (
+          <span className="text-slate-400">لم يتم التعيين بعد</span>
+        ),
+    },
+    { key: 'hospitalName', header: 'المستشفى', value: (h) => h.name },
+    {
+      key: 'email',
+      header: 'بريد الدخول',
+      value: (h) => h.coordinator?.email ?? null,
+      render: (h) => {
+        const coordinator = h.coordinator;
+        if (!coordinator) return <span className="text-slate-400">لا يوجد بريد</span>;
+        return (
+          <span className="flex items-center gap-1.5">
+            <Mail className="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true" />
+            <span className="font-mono text-[11px] text-slate-600" dir="ltr">
+              {coordinator.email}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleCopyEmail(coordinator.email)}
+              className="text-slate-400 hover:text-teal-600"
+              title="نسخ البريد"
+            >
+              {copiedEmail === coordinator.email ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+              <span className="sr-only">نسخ البريد</span>
+            </button>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'accountStatus',
+      header: 'حالة الحساب',
+      value: (h) => (h.coordinator ? 'كلمة المرور مفعلة' : 'بانتظار التعيين'),
+      render: (h) =>
+        h.coordinator ? (
+          <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-medium inline-flex items-center gap-1 whitespace-nowrap">
+            <Lock className="w-2.5 h-2.5" aria-hidden="true" />
+            كلمة المرور مفعلة
+          </span>
+        ) : (
+          <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-medium whitespace-nowrap">
+            بانتظار التعيين
+          </span>
+        ),
+    },
+  ];
+
+  const hospitalActions: RowAction<HospitalDTO>[] = [
+    { label: 'البروفايل الشامل', icon: Sparkles, tone: 'primary', onSelect: (h) => setSelectedHospitalId(h.id) },
+    { label: 'تعديل بيانات المستشفى', icon: Edit2, onSelect: handleOpenEdit },
+    { label: 'تفعيل / تعطيل المستشفى', icon: Power, onSelect: (h) => run(() => toggleHospitalStatus(h.id)) },
+  ];
+
+  const coordinatorActions: RowAction<HospitalDTO>[] = [
+    {
+      label: 'بيانات الدخول وكلمة المرور',
+      icon: Key,
+      tone: 'primary',
+      isAvailable: (h) => h.coordinator !== null,
+      onSelect: handleOpenEditCoordinator,
+    },
+    {
+      label: 'تعيين منسق',
+      icon: UserPlus,
+      tone: 'primary',
+      isAvailable: (h) => h.coordinator === null,
+      onSelect: (h) => handleOpenAddCoordinator(h.id),
+    },
+    { label: 'تعديل بيانات المستشفى', icon: Edit2, onSelect: handleOpenEdit },
+  ];
+
+  // The comprehensive profile shows four narrow tables for one hospital; the summary panels above them
+  // stay as they are.
+  const profilePractitionerColumns: ColumnDef<PractitionerDTO>[] = [
+    { key: 'name', header: 'الممارس', value: (pr) => pr.name, render: (pr) => <span className="font-bold text-slate-800">{pr.name}</span> },
+    { key: 'role', header: 'المسمى', value: (pr) => pr.role, render: (pr) => <span className="text-slate-500">{pr.role}</span> },
+    {
+      key: 'licenseNumber',
+      header: 'رقم الترخيص',
+      align: 'end',
+      value: (pr) => pr.licenseNumber,
+      render: (pr) =>
+        pr.licenseNumber ? (
+          <span className="text-[10px] bg-teal-50 text-teal-700 px-2 py-0.5 rounded font-mono whitespace-nowrap">{pr.licenseNumber}</span>
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
+    },
+  ];
+
+  const profileEquipmentColumns: ColumnDef<EquipmentDTO>[] = [
+    { key: 'name', header: 'الجهاز', value: (e) => e.name, render: (e) => <span className="font-bold text-slate-800">{e.name}</span> },
+    { key: 'type', header: 'النوع', value: (e) => e.type, render: (e) => <span className="text-slate-500">{e.type}</span> },
+    {
+      key: 'status',
+      header: 'الحالة',
+      align: 'end',
+      value: (e) => e.status,
+      render: (e) =>
+        e.status ? (
+          <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-700 whitespace-nowrap">{e.status}</span>
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
+    },
+  ];
+
+  const profileVisitColumns: ColumnDef<VisitDTO>[] = [
+    {
+      key: 'visitDate',
+      header: 'تاريخ الزيارة',
+      type: 'date',
+      value: (v) => v.visitDate,
+      render: (v) => <span className="font-bold text-slate-800 whitespace-nowrap">{formatDate(v.visitDate)}</span>,
+    },
+    { key: 'team', header: 'الفريق الزائر', value: (v) => v.team, render: (v) => <span className="text-slate-500">{v.team}</span> },
+    {
+      key: 'result',
+      header: 'النتيجة',
+      align: 'end',
+      value: (v) => (v.status === 'completed' ? v.complianceScore : null),
+      render: (v) => (
+        <span className="text-xs font-bold text-teal-700 font-mono whitespace-nowrap">
+          {v.status === 'completed' ? (v.complianceScore !== null ? `${v.complianceScore}%` : '—') : 'قيد المتابعة'}
+        </span>
+      ),
+    },
+  ];
+
+  const profileTrainingColumns: ColumnDef<TrainingDTO>[] = [
+    { key: 'title', header: 'البرنامج', value: (t) => t.title, render: (t) => <span className="font-bold text-slate-800">{t.title}</span> },
+    {
+      key: 'due',
+      header: 'النوع / الاستحقاق',
+      value: (t) => (t.isInternal ? 'تدريب داخلي' : t.dueDate),
+      render: (t) => (
+        <span className="text-[11px] text-slate-500">{t.isInternal ? 'تدريب داخلي' : `استحقاق: ${formatDate(t.dueDate)}`}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'الحالة',
+      align: 'end',
+      value: (t) => (t.status === 'completed' ? 'مكتمل' : t.status === 'late' ? 'متأخر' : 'معلق'),
+      render: (t) => (
+        <span
+          className={`text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap ${
+            t.status === 'completed'
+              ? 'bg-emerald-100 text-emerald-800'
+              : t.status === 'late'
+                ? 'bg-rose-100 text-rose-800'
+                : 'bg-amber-100 text-amber-800'
+          }`}
+        >
+          {t.status === 'completed' ? 'مكتمل' : t.status === 'late' ? 'متأخر' : 'معلق'}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
@@ -226,7 +492,7 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
               <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
                 مستشفيات التجمع ومنسقو مكافحة العدوى
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
-                  {hospitals.length} منشأة
+                  {hospitalsShown ?? hospitals.length} منشأة
                 </span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -270,136 +536,21 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
               </button>
             </div>
 
-            <div className="relative my-2 w-64">
-              <input
-                type="text"
-                placeholder="بحث بالاسم، الموقع، أو المنسق..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
-              />
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2" />
-            </div>
           </div>
 
           {activeSubTab === 'hospitals' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {filteredHospitals.length === 0 && (
-                <div className="col-span-full bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-                  لا توجد مستشفيات مسجلة مطابقة
-                </div>
-              )}
-              {filteredHospitals.map((hospital) => {
-                const hVisits = visits.filter((v) => v.hospitalId === hospital.id);
-                const hTrainings = trainings.filter((t) => t.hospitalId === hospital.id);
-                const hPractitioners = practitioners.filter((p) => p.hospitalId === hospital.id);
-                const hEquipments = equipments.filter((e) => e.hospitalId === hospital.id);
-
-                return (
-                  <div
-                    key={hospital.id}
-                    className={`bg-white rounded-xl border transition-all hover:shadow-md ${
-                      hospital.isActive ? 'border-slate-200' : 'border-rose-200 bg-rose-50/20'
-                    }`}
-                  >
-                    <div className="p-5">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 shrink-0">
-                            <Building2 className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-sm text-slate-900 leading-tight">{hospital.name}</h3>
-                            <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
-                              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
-                                {hospital.type}
-                              </span>
-                              <span className="flex items-center gap-1 text-slate-400">
-                                <MapPin className="w-3 h-3" />
-                                {hospital.location}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => run(() => toggleHospitalStatus(hospital.id))}
-                            disabled={isPending}
-                            className={`p-1.5 rounded-lg border text-xs transition-colors disabled:opacity-60 ${
-                              hospital.isActive
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                            }`}
-                            title={hospital.isActive ? 'تعطيل المستشفى مؤقتاً' : 'تفعيل المستشفى'}
-                          >
-                            <Power className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            onClick={() => handleOpenEdit(hospital)}
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                            title="تعديل بيانات المستشفى"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-50 rounded-lg p-3 text-xs border border-slate-100 mb-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-slate-700 font-medium">
-                            <UserCheck className="w-4 h-4 text-teal-600 shrink-0" />
-                            <span>المنسق: {hospital.coordinator?.name ?? 'لم يتم التعيين بعد'}</span>
-                          </div>
-                        </div>
-                        {hospital.coordinator && (
-                          <div className="flex items-center gap-2 text-slate-500 text-[11px] mt-1 mr-6">
-                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="font-mono text-[11px]" dir="ltr">
-                              {hospital.coordinator.email}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-2 text-center text-xs pt-3 border-t border-slate-100">
-                        <div className="bg-slate-50/80 rounded-lg p-2">
-                          <span className="block text-[10px] text-slate-400">الزيارات</span>
-                          <span className="font-bold text-slate-800 font-mono text-sm">{hVisits.length}</span>
-                        </div>
-                        <div className="bg-slate-50/80 rounded-lg p-2">
-                          <span className="block text-[10px] text-slate-400">التدريبات</span>
-                          <span className="font-bold text-slate-800 font-mono text-sm">{hTrainings.length}</span>
-                        </div>
-                        <div className="bg-slate-50/80 rounded-lg p-2">
-                          <span className="block text-[10px] text-slate-400">الممارسون</span>
-                          <span className="font-bold text-slate-800 font-mono text-sm">{hPractitioners.length}</span>
-                        </div>
-                        <div className="bg-slate-50/80 rounded-lg p-2">
-                          <span className="block text-[10px] text-slate-400">الأجهزة</span>
-                          <span className="font-bold text-slate-800 font-mono text-sm">{hEquipments.length}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
-                      <span className={`text-[11px] font-bold ${hospital.isActive ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {hospital.isActive ? 'مفعل ويعمل بكفاءة' : 'معطل مؤقتاً'}
-                      </span>
-
-                      <button
-                        onClick={() => setSelectedHospitalId(hospital.id)}
-                        className="text-xs font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1"
-                      >
-                        <span>البروفايل الشامل</span>
-                        <Sparkles className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <DataTable
+              key="hospitals"
+              rows={hospitals}
+              columns={hospitalColumns}
+              rowKey={(h) => h.id}
+              actions={hospitalActions}
+              onStateChange={({ filteredCount }) => setHospitalsShown(filteredCount)}
+              searchPlaceholder="بحث بالاسم، الموقع، أو المنسق..."
+              emptyMessage="لا توجد مستشفيات مسجلة بعد"
+              noMatchMessage="لا توجد مستشفيات مسجلة مطابقة"
+              caption="قائمة مستشفيات التجمع"
+            />
           )}
 
           {activeSubTab === 'coordinators' && (
@@ -429,94 +580,17 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                 </div>
               </div>
 
-              <div className="divide-y divide-slate-100">
-                {filteredHospitals.length === 0 && (
-                  <div className="p-8 text-center text-slate-400 text-xs">لا توجد مستشفيات مسجلة مطابقة</div>
-                )}
-                {filteredHospitals.map((hospital) => {
-                  const coordinator = hospital.coordinator;
-                  return (
-                    <div
-                      key={hospital.id}
-                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors"
-                    >
-                      <div className="flex items-start sm:items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-sm shrink-0">
-                          {coordinator ? coordinator.name.charAt(0) : 'م'}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-xs text-slate-900">
-                              {coordinator?.name ?? 'لم يتم التعيين بعد'}
-                            </span>
-                            <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-medium">
-                              {hospital.name}
-                            </span>
-                            {coordinator && (
-                              <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-medium flex items-center gap-1">
-                                <Lock className="w-2.5 h-2.5" />
-                                كلمة المرور مفعلة
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500 flex-wrap">
-                            <span className="font-mono text-[11px] text-slate-600 flex items-center gap-1" dir="ltr">
-                              <Mail className="w-3 h-3 text-slate-400" />
-                              {coordinator?.email ?? 'لا يوجد بريد'}
-                            </span>
-                            {coordinator && (
-                              <button
-                                onClick={() => handleCopyEmail(coordinator.email)}
-                                className="text-slate-400 hover:text-teal-600"
-                                title="نسخ البريد"
-                              >
-                                {copiedEmail === coordinator.email ? (
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-3 h-3" />
-                                )}
-                              </button>
-                            )}
-                            <span className="text-slate-300">|</span>
-                            <span className="text-[10px] text-slate-500">
-                              صلاحية الوصول: شاشات مستشفى {hospital.name} فقط
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        {coordinator ? (
-                          <button
-                            onClick={() => handleOpenEditCoordinator(hospital)}
-                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                            title="تعديل بيانات وحساب المنسق وكلمة المرور"
-                          >
-                            <Key className="w-3 h-3 text-teal-600" />
-                            <span>بيانات الدخول وكلمة المرور</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleOpenAddCoordinator(hospital.id)}
-                            className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-                          >
-                            <UserPlus className="w-3 h-3 text-teal-600" />
-                            <span>تعيين منسق</span>
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => handleOpenEdit(hospital)}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                          <span>المستشفى</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <DataTable
+                key="coordinators"
+                rows={hospitals}
+                columns={coordinatorColumns}
+                rowKey={(h) => h.id}
+                actions={coordinatorActions}
+                searchPlaceholder="بحث بالمنسق، المستشفى، أو البريد..."
+                emptyMessage="لا توجد مستشفيات مسجلة بعد"
+                noMatchMessage="لا توجد مستشفيات مسجلة مطابقة"
+                caption="سجل حسابات منسقي مكافحة العدوى"
+              />
             </div>
           )}
         </>
@@ -578,25 +652,17 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                   <Users className="w-4 h-4 text-teal-600" />
                   <span>فريق مكافحة العدوى والممارسين المعتمدين</span>
                 </div>
-                <div className="space-y-2 max-h-44 overflow-y-auto">
-                  {practitioners.filter((p) => p.hospitalId === selectedHospitalForProfile.id).length === 0 ? (
-                    <p className="text-slate-400 text-center py-4 text-xs">لا يوجد ممارسون مسجلون حالياً</p>
-                  ) : (
-                    practitioners
-                      .filter((p) => p.hospitalId === selectedHospitalForProfile.id)
-                      .map((prac) => (
-                        <div key={prac.id} className="p-2.5 bg-slate-50 rounded-lg text-xs flex justify-between">
-                          <div>
-                            <strong className="block text-slate-800">{prac.name}</strong>
-                            <span className="text-[11px] text-slate-500">{prac.role}</span>
-                          </div>
-                          <span className="text-[10px] bg-teal-50 text-teal-700 px-2 py-0.5 rounded font-mono">
-                            {prac.licenseNumber ?? '—'}
-                          </span>
-                        </div>
-                      ))
-                  )}
-                </div>
+                <DataTable
+                  key={`prac-${selectedHospitalForProfile.id}`}
+                  rows={practitioners.filter((pr) => pr.hospitalId === selectedHospitalForProfile.id)}
+                  columns={profilePractitionerColumns}
+                  rowKey={(pr) => pr.id}
+                  pageSize={10}
+                  searchPlaceholder="بحث في الممارسين..."
+                  emptyMessage="لا يوجد ممارسون مسجلون حالياً"
+                  noMatchMessage="لا يوجد ممارسون مطابقون للبحث"
+                  caption="ممارسو المستشفى في البروفايل الشامل"
+                />
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-slate-200">
@@ -604,27 +670,17 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                   <Wrench className="w-4 h-4 text-teal-600" />
                   <span>أجهزة ومعدات التعقيم والفحص المعتمدة</span>
                 </div>
-                <div className="space-y-2 max-h-44 overflow-y-auto">
-                  {equipments.filter((e) => e.hospitalId === selectedHospitalForProfile.id).length === 0 ? (
-                    <p className="text-slate-400 text-center py-4 text-xs">لا توجد معدات مسجلة حالياً</p>
-                  ) : (
-                    equipments
-                      .filter((e) => e.hospitalId === selectedHospitalForProfile.id)
-                      .map((eq) => (
-                        <div key={eq.id} className="p-2.5 bg-slate-50 rounded-lg text-xs flex justify-between">
-                          <div>
-                            <strong className="block text-slate-800">{eq.name}</strong>
-                            <span className="text-[11px] text-slate-500">{eq.type}</span>
-                          </div>
-                          {eq.status && (
-                            <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-700">
-                              {eq.status}
-                            </span>
-                          )}
-                        </div>
-                      ))
-                  )}
-                </div>
+                <DataTable
+                  key={`eq-${selectedHospitalForProfile.id}`}
+                  rows={equipments.filter((e) => e.hospitalId === selectedHospitalForProfile.id)}
+                  columns={profileEquipmentColumns}
+                  rowKey={(e) => e.id}
+                  pageSize={10}
+                  searchPlaceholder="بحث في الأجهزة..."
+                  emptyMessage="لا توجد معدات مسجلة حالياً"
+                  noMatchMessage="لا توجد معدات مطابقة للبحث"
+                  caption="أجهزة المستشفى في البروفايل الشامل"
+                />
               </div>
             </div>
 
@@ -634,29 +690,17 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                   <ClipboardList className="w-4 h-4 text-teal-600" />
                   <span>سجل الزيارات الرقابية</span>
                 </div>
-                <div className="space-y-2 max-h-44 overflow-y-auto">
-                  {visits.filter((v) => v.hospitalId === selectedHospitalForProfile.id).length === 0 ? (
-                    <p className="text-slate-400 text-center py-4 text-xs">لا توجد زيارات رقابية مسجلة</p>
-                  ) : (
-                    visits
-                      .filter((v) => v.hospitalId === selectedHospitalForProfile.id)
-                      .map((vis) => (
-                        <div key={vis.id} className="p-2.5 bg-slate-50 rounded-lg text-xs flex justify-between items-center">
-                          <div>
-                            <strong className="block text-slate-800">{formatDate(vis.visitDate)}</strong>
-                            <span className="text-[11px] text-slate-500">الفريق الزائر: {vis.team}</span>
-                          </div>
-                          <span className="text-xs font-bold text-teal-700 font-mono">
-                            {vis.status === 'completed'
-                              ? vis.complianceScore !== null
-                                ? `${vis.complianceScore}%`
-                                : '—'
-                              : 'قيد المتابعة'}
-                          </span>
-                        </div>
-                      ))
-                  )}
-                </div>
+                <DataTable
+                  key={`vis-${selectedHospitalForProfile.id}`}
+                  rows={visits.filter((v) => v.hospitalId === selectedHospitalForProfile.id)}
+                  columns={profileVisitColumns}
+                  rowKey={(v) => v.id}
+                  pageSize={10}
+                  searchPlaceholder="بحث في الزيارات..."
+                  emptyMessage="لا توجد زيارات رقابية مسجلة"
+                  noMatchMessage="لا توجد زيارات مطابقة للبحث"
+                  caption="زيارات المستشفى في البروفايل الشامل"
+                />
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-slate-200">
@@ -664,35 +708,17 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                   <GraduationCap className="w-4 h-4 text-teal-600" />
                   <span>البرامج والمسارات التدريبية</span>
                 </div>
-                <div className="space-y-2 max-h-44 overflow-y-auto">
-                  {trainings.filter((t) => t.hospitalId === selectedHospitalForProfile.id).length === 0 ? (
-                    <p className="text-slate-400 text-center py-4 text-xs">لا توجد برامج تدريبية مسجلة</p>
-                  ) : (
-                    trainings
-                      .filter((t) => t.hospitalId === selectedHospitalForProfile.id)
-                      .map((trn) => (
-                        <div key={trn.id} className="p-2.5 bg-slate-50 rounded-lg text-xs flex justify-between items-center">
-                          <div>
-                            <strong className="block text-slate-800">{trn.title}</strong>
-                            <span className="text-[11px] text-slate-500">
-                              {trn.isInternal ? 'تدريب داخلي' : `استحقاق: ${formatDate(trn.dueDate)}`}
-                            </span>
-                          </div>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                              trn.status === 'completed'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : trn.status === 'late'
-                                  ? 'bg-rose-100 text-rose-800'
-                                  : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {trn.status === 'completed' ? 'مكتمل' : trn.status === 'late' ? 'متأخر' : 'معلق'}
-                          </span>
-                        </div>
-                      ))
-                  )}
-                </div>
+                <DataTable
+                  key={`trn-${selectedHospitalForProfile.id}`}
+                  rows={trainings.filter((t) => t.hospitalId === selectedHospitalForProfile.id)}
+                  columns={profileTrainingColumns}
+                  rowKey={(t) => t.id}
+                  pageSize={10}
+                  searchPlaceholder="بحث في البرامج التدريبية..."
+                  emptyMessage="لا توجد برامج تدريبية مسجلة"
+                  noMatchMessage="لا توجد برامج مطابقة للبحث"
+                  caption="تدريبات المستشفى في البروفايل الشامل"
+                />
               </div>
             </div>
           </div>

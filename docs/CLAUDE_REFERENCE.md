@@ -1,10 +1,11 @@
 # IPC Management Portal — Reference Doc for Claude
 
-Orientation doc for future sessions. Updated 2026-09-15 after the migration from the
-Vite client-only SPA to Next.js App Router with a server-side data layer.
+Orientation doc for future sessions. Updated 2026-09-27: attendance decoupled from `Practitioner`
+(feature 001) and every record list moved onto one shared table (feature 002). The stack itself dates from
+the migration off the Vite client-only SPA to Next.js App Router with a server-side data layer.
 
 Source documents:
-- `docs/SRS_IPC_Management_Portal_Neon.md` — Arabic SRS v1.0. **The functional spec** (FR-1…FR-43, data model, NFRs). Requirements deliberately superseded by later decisions are listed in §8 — check it before treating an FR as binding.
+- `docs/SRS_IPC_Management_Portal_Neon.md` — Arabic SRS v1.0. **The functional spec** (FR-1…FR-43, data model, NFRs). Requirements deliberately superseded by later decisions are listed in §9 — check it before treating an FR as binding.
 - `docs/OFFICIAL_SYSTEM_SPECIFICATIONS.md` — Arabic "production spec". Its **Dev Admin** section (hardcoded email, hidden superuser) and "Neon modal" deployment steps are **intentionally not implemented** — they were a security backdoor. Do not reintroduce them.
 - `docs/DESIGN-apple.md` — Apple.com design-token analysis; a style reference only.
 - There is no PRD in the repo.
@@ -54,6 +55,9 @@ src/app/api/files/[id]            authorized downloads
 src/app/api/reports/kpis          FR-43 central CSV export (?from&to)
 src/app/api/cron/notifications    FR-35/36 reminders, Bearer CRON_SECRET, idempotent
 src/components/views/*View.tsx    client screens (list + detail), mutations via useActionRunner
+src/components/table/*            shared record table (DataTable + useTableState + parts)
+src/lib/table.ts                  ColumnDef/RowAction/TableState types, Arabic collator + search normalisation
+src/app/(portal)/*/loading.tsx    route-transition skeleton (TableSkeleton)
 src/server/{db,auth,queries,actions,files,audit,notify,validation,run-action}.ts
 prisma/schema.prisma, prisma/migrations/, prisma.config.ts
 scripts/create-admin.ts           bootstrap first central user (no seed data exists)
@@ -72,7 +76,7 @@ Screens → routes: dashboard, visits, trainings, hospitals (central) / hospital
   text, ≤200 chars) or `headcount`, never both. A CHECK constraint enforces the per-row rule and a
   partial unique index allows at most one headcount row per training; the write path replaces a
   training's whole set inside one transaction, taking `SELECT … FOR UPDATE` on the training so two
-  concurrent saves cannot merge. There is **no** link to `Practitioner` (see §8 D-001).
+  concurrent saves cannot merge. There is **no** link to `Practitioner` (see §9 D-001).
 - Programs UI treats Program as a root node and ProgramFolder as child nodes (`listProgramTree`).
 
 ## 6. Operations
@@ -85,16 +89,45 @@ npm run build && npm start
 ```
 Schedule `GET /api/cron/notifications` (Authorization: Bearer $CRON_SECRET), e.g. hourly.
 
-## 7. Known gaps (not implemented)
+## 7. Rendering record lists (the convention, feature 002)
+
+Every list of records renders through **`<DataTable />`** in `src/components/table/`. A screen supplies a
+`ColumnDef[]` and its already-scoped rows; the table adds sorting, search, paging and the two empty states.
+Do **not** write a new card grid or a hand-rolled `<table>` for records — there are none left in
+`src/components/views/`, and re-adding one puts that screen back outside the shared behaviour.
+
+- `src/lib/table.ts` holds the types and the two pure helpers: `compareValues` (cached
+  `Intl.Collator('ar', { numeric: true, sensitivity: 'base' })`, absent values last in **both** directions)
+  and `normalizeForSearch` (trim, lowercase, strip harakat and tatweel, unify `أ إ آ ٱ` → `ا`; it
+  deliberately does not fold `ة`→`ه` or `ى`→`ي`).
+- **Paging is client-side only.** The screen still receives every row it is allowed to see and the table
+  slices one page out of that array. This feature improved findability, **not** load time or memory —
+  server-side paging is a deferred follow-up, so do not cite this table as a fix for large-list performance.
+- Sorting/filtering 1,000 rows measured 127–160 ms end to end at the default 25-row page. At 100 rows per
+  page the same interactions cost ~320–355 ms, because both layouts are rendered and switched by CSS.
+- Selection stays in the parent screen (`selectedRowKey` + `onRowSelect`), so a master-detail screen can
+  report a selection the current filter excludes instead of showing stale detail.
+- Sub-sections (assets, hospitals) need **one table instance each and a distinct React `key`** — two
+  `<DataTable/>`s at the same position in the tree otherwise share one instance, and search/sort state
+  leaks between the tabs.
+- Client-side filtering is not access control. Rows must already be role-scoped by the server query.
+- Below the `md` breakpoint the table renders as stacked cards (a `<dl>` per record); columns marked
+  `hideBelowMd` are omitted there. The card layout carries its own sort control, since there are no headers
+  to activate.
+- Arabic collation note: ICU treats `آ` as a distinct letter from `أ`/`ا`, so `آ`-initial names sort before
+  the others. Search normalisation unifies all three; sorting does not.
+
+## 8. Known gaps (not implemented)
 
 - FR-35 **email** delivery (in-app notifications only; no mail provider in the spec).
 - FR-42 PDF export is browser print (`window.print()`), not server-generated PDFs.
 - FR-43 export is Excel-compatible CSV, not native `.xlsx`.
 - No login rate limiting / lockout; no password self-service reset (central resets coordinator passwords).
-- Audit screen shows latest 500 entries (no pagination).
+- Audit screen loads the latest 500 entries; they are paged client-side by the shared table, and its CSV
+  export emits the filtered-and-sorted set the user is looking at.
 - File bytes live on local disk under `UPLOADS_DIR`, not in Postgres. On a failed upload transaction the written file is not cleaned up (harmless orphan, no automated sweep yet).
 
-## 8. Recorded deviations from the SRS (constitution Principle IV)
+## 9. Recorded deviations from the SRS (constitution Principle IV)
 
 Deviations are recorded here, not by editing the SRS. Each entry names what is superseded, by
 what, and whether the SRS document itself still needs a manual update.

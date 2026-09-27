@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Users2, Wrench, Plus, Edit2, Search, CheckCircle2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Users2, Wrench, Plus, Edit2, X } from 'lucide-react';
 import type { EquipmentDTO, HospitalDTO, PractitionerDTO, SessionUser } from '@/lib/types';
+import type { ColumnDef, RowAction } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate, todayInputValue } from '@/lib/format';
 import { createPractitioner, updatePractitioner } from '@/server/actions/practitioners';
 import { createEquipment, updateEquipment } from '@/server/actions/equipment';
@@ -23,7 +25,6 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
   const { run, isPending } = useActionRunner();
 
   const [activeTab, setActiveTab] = useState<'practitioners' | 'equipments'>('practitioners');
-  const [searchQuery, setSearchQuery] = useState('');
   const [filterHospital, setFilterHospital] = useState('');
 
   const [showAddPracModal, setShowAddPracModal] = useState(false);
@@ -45,29 +46,102 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
   const [eqStatus, setEqStatus] = useState(EQUIPMENT_STATUSES[0]);
   const [eqMaint, setEqMaint] = useState(todayInputValue());
 
-  const q = searchQuery.toLowerCase();
+  // The hospital select keeps narrowing both lists as before; each table owns its own search, sort and
+  // page state so switching tabs cannot carry one section's state into the other (FR-020).
+  const scopedPractitioners = useMemo(
+    () => practitioners.filter((p) => !(isCentral && filterHospital) || p.hospitalId === filterHospital),
+    [practitioners, isCentral, filterHospital],
+  );
+  const scopedEquipments = useMemo(
+    () => equipments.filter((e) => !(isCentral && filterHospital) || e.hospitalId === filterHospital),
+    [equipments, isCentral, filterHospital],
+  );
 
-  const filteredPractitioners = practitioners.filter((p) => {
-    if (isCentral && filterHospital && p.hospitalId !== filterHospital) return false;
-    if (!q) return true;
-    return (
-      p.name.toLowerCase().includes(q) ||
-      p.role.toLowerCase().includes(q) ||
-      (p.licenseNumber ?? '').toLowerCase().includes(q) ||
-      p.hospitalName.toLowerCase().includes(q)
-    );
-  });
+  const practitionerColumns = useMemo<ColumnDef<PractitionerDTO>[]>(
+    () => [
+      {
+        key: 'name',
+        header: 'اسم الممارس',
+        value: (p) => p.name,
+        render: (p) => (
+          <span className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700 font-bold text-[10px] shrink-0">
+              {p.name.slice(0, 1)}
+            </span>
+            <span className="font-bold text-slate-900">{p.name}</span>
+          </span>
+        ),
+      },
+      { key: 'role', header: 'المسمى الوظيفي', value: (p) => p.role, render: (p) => <span className="text-teal-700 font-medium">{p.role}</span> },
+      {
+        key: 'licenseNumber',
+        header: 'رقم رخصة الهيئة (SCFHS)',
+        value: (p) => p.licenseNumber,
+        render: (p) => <span className="font-mono">{p.licenseNumber ?? <span className="text-slate-300">—</span>}</span>,
+      },
+      { key: 'hospitalName', header: 'المنشأة التابع لها', value: (p) => p.hospitalName },
+      {
+        key: 'email',
+        header: 'البريد الإلكتروني',
+        value: (p) => p.email,
+        render: (p) => <span className="font-mono text-[10px] text-slate-500">{p.email ?? <span className="text-slate-300">—</span>}</span>,
+        hideBelowMd: true,
+      },
+    ],
+    [],
+  );
 
-  const filteredEquipments = equipments.filter((e) => {
-    if (isCentral && filterHospital && e.hospitalId !== filterHospital) return false;
-    if (!q) return true;
-    return (
-      e.name.toLowerCase().includes(q) ||
-      e.type.toLowerCase().includes(q) ||
-      (e.serialNumber ?? '').toLowerCase().includes(q) ||
-      e.hospitalName.toLowerCase().includes(q)
-    );
-  });
+  const equipmentColumns = useMemo<ColumnDef<EquipmentDTO>[]>(
+    () => [
+      {
+        key: 'name',
+        header: 'اسم الجهاز',
+        value: (e) => e.name,
+        render: (e) => (
+          <span className="flex items-center gap-2">
+            <Wrench className="w-3.5 h-3.5 text-indigo-600 shrink-0" aria-hidden="true" />
+            <span className="font-bold text-slate-900">{e.name}</span>
+          </span>
+        ),
+      },
+      { key: 'type', header: 'نوع الجهاز', value: (e) => e.type, render: (e) => <span className="text-indigo-700 font-medium">{e.type}</span> },
+      {
+        key: 'serialNumber',
+        header: 'الرقم التسلسلي (SN)',
+        value: (e) => e.serialNumber,
+        render: (e) => <span className="font-mono">{e.serialNumber ?? <span className="text-slate-300">—</span>}</span>,
+      },
+      { key: 'hospitalName', header: 'المنشأة', value: (e) => e.hospitalName },
+      {
+        key: 'status',
+        header: 'الحالة',
+        value: (e) => e.status,
+        render: (e) =>
+          e.status ? (
+            <span
+              className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                e.status === EQUIPMENT_STATUSES[0]
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}
+            >
+              {e.status}
+            </span>
+          ) : (
+            <span className="text-slate-300">—</span>
+          ),
+      },
+      {
+        key: 'lastMaintenance',
+        header: 'آخر صيانة وقائية',
+        type: 'date',
+        value: (e) => e.lastMaintenance,
+        render: (e) => <span className="whitespace-nowrap">{e.lastMaintenance ? formatDate(e.lastMaintenance) : 'غير محدد'}</span>,
+        hideBelowMd: true,
+      },
+    ],
+    [],
+  );
 
   const closePracModal = () => {
     setShowAddPracModal(false);
@@ -147,6 +221,13 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
     run(() => (target ? updateEquipment(target.id, payload) : createEquipment(payload)), closeEqModal);
   };
 
+  const practitionerActions: RowAction<PractitionerDTO>[] = [
+    { label: 'تعديل بيانات الممارس', icon: Edit2, onSelect: handleOpenEditPrac },
+  ];
+  const equipmentActions: RowAction<EquipmentDTO>[] = [
+    { label: 'تعديل بيانات الجهاز', icon: Edit2, onSelect: handleOpenEditEq },
+  ];
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
@@ -214,17 +295,6 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="بحث بالاسم، الترخيص، الرقم التسلسلي..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white w-56"
-            />
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-          </div>
-
           {isCentral && (
             <select
               value={filterHospital}
@@ -243,128 +313,31 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
       </div>
 
       {activeTab === 'practitioners' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPractitioners.length === 0 ? (
-            <div className="col-span-full bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-              لا يوجد ممارسون مطابقون للبحث
-            </div>
-          ) : (
-            filteredPractitioners.map((prac) => (
-              <div
-                key={prac.id}
-                className="bg-white p-5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs space-y-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm">
-                      {prac.name.slice(0, 1)}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xs text-slate-900 leading-tight">{prac.name}</h4>
-                      <p className="text-[11px] text-teal-700 font-medium mt-0.5">{prac.role}</p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenEditPrac(prac)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-                    title="تعديل بيانات الممارس"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5 text-[11px]">
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>رقم رخصة الهيئة (SCFHS):</span>
-                    <strong className="font-mono text-slate-800">{prac.licenseNumber ?? '—'}</strong>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>المنشأة التابع لها:</span>
-                    <strong className="text-slate-800 truncate max-w-[140px]">{prac.hospitalName}</strong>
-                  </div>
-                  {prac.email && (
-                    <div className="flex items-center justify-between text-slate-600">
-                      <span>البريد:</span>
-                      <span className="font-mono text-slate-500 text-[10px] truncate max-w-[140px]">{prac.email}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
-                  <span className="flex items-center gap-1 text-emerald-700 font-medium">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    عضو معتمد في فريق مكافحة العدوى
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <DataTable
+          // Both sub-sections render a DataTable at the same position, so without distinct keys React
+          // reuses one instance and its search/sort/page state leaks between the tabs (FR-020).
+          key="practitioners"
+          rows={scopedPractitioners}
+          columns={practitionerColumns}
+          rowKey={(p) => p.id}
+          actions={practitionerActions}
+          searchPlaceholder="بحث بالاسم، المسمى، رقم الترخيص..."
+          emptyMessage="لا يوجد ممارسون مسجلون بعد"
+          noMatchMessage="لا يوجد ممارسون مطابقون للبحث"
+          caption="سجل الممارسين الصحيين"
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEquipments.length === 0 ? (
-            <div className="col-span-full bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
-              لا توجد أجهزة مطابقة للبحث
-            </div>
-          ) : (
-            filteredEquipments.map((eq) => (
-              <div
-                key={eq.id}
-                className="bg-white p-5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs space-y-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700">
-                      <Wrench className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xs text-slate-900 leading-tight">{eq.name}</h4>
-                      <p className="text-[11px] text-indigo-700 font-medium mt-0.5">{eq.type}</p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenEditEq(eq)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-                    title="تعديل بيانات الجهاز"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5 text-[11px]">
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>الرقم التسلسلي (SN):</span>
-                    <strong className="font-mono text-slate-800">{eq.serialNumber ?? '—'}</strong>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>المنشأة:</span>
-                    <strong className="text-slate-800 truncate max-w-[140px]">{eq.hospitalName}</strong>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>آخر صيانة وقائية:</span>
-                    <strong className="text-slate-800">{eq.lastMaintenance ? formatDate(eq.lastMaintenance) : 'غير محدد'}</strong>
-                  </div>
-                </div>
-
-                {eq.status && (
-                  <div className="flex items-center justify-between pt-1">
-                    <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                        eq.status === EQUIPMENT_STATUSES[0]
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}
-                    >
-                      {eq.status}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+        <DataTable
+          key="equipment"
+          rows={scopedEquipments}
+          columns={equipmentColumns}
+          rowKey={(e) => e.id}
+          actions={equipmentActions}
+          searchPlaceholder="بحث بالاسم، النوع، الرقم التسلسلي..."
+          emptyMessage="لا توجد أجهزة مسجلة بعد"
+          noMatchMessage="لا توجد أجهزة مطابقة للبحث"
+          caption="سجل الأجهزة والمعدات"
+        />
       )}
 
       {(showAddPracModal || editingPrac) && (

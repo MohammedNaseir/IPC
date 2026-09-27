@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck,
@@ -16,6 +16,8 @@ import {
   X,
 } from 'lucide-react';
 import type { HospitalDTO, SessionUser, TrainingDTO, VisitDTO } from '@/lib/types';
+import type { ColumnDef } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { averageCompliance, formatDate, todayInputValue } from '@/lib/format';
 
 interface DashboardViewProps {
@@ -78,6 +80,90 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
   };
 
   const completedAngle = trainings.length > 0 ? (completedTrainings.length / trainings.length) * 100 : 0;
+
+  // FR-39 comparison table only. The KPI cards, alert cards, bar chart and donut are out of scope.
+  const comparisonColumns = useMemo<ColumnDef<HospitalDTO>[]>(() => {
+    const completedOf = (hospitalId: string) =>
+      visits.filter((v) => v.hospitalId === hospitalId && v.status === 'completed');
+    const totalOf = (hospitalId: string) => visits.filter((v) => v.hospitalId === hospitalId);
+    const scoreOf = (hospitalId: string) => averageCompliance(completedOf(hospitalId).map((v) => v.complianceScore));
+
+    return [
+      { key: 'name', header: 'اسم المستشفى', value: (h) => h.name, render: (h) => <span className="font-bold text-slate-900">{h.name}</span> },
+      {
+        key: 'typeLocation',
+        header: 'النوع والموقع',
+        value: (h) => `${h.type} ${h.location}`,
+        render: (h) => (
+          <span className="block">
+            <span className="block font-medium">{h.type}</span>
+            <span className="text-[11px] text-slate-400">{h.location}</span>
+          </span>
+        ),
+      },
+      {
+        key: 'coordinator',
+        header: 'منسق مكافحة العدوى',
+        value: (h) => h.coordinator?.name ?? null,
+        render: (h) => (
+          <span className="block">
+            <span className="block font-medium">{h.coordinator?.name ?? 'غير محدد'}</span>
+            {h.coordinator?.email && (
+              <span className="text-[11px] text-slate-400" dir="ltr">
+                {h.coordinator.email}
+              </span>
+            )}
+          </span>
+        ),
+      },
+      {
+        key: 'completedVisits',
+        header: 'الزيارات المنجزة',
+        type: 'number',
+        align: 'end',
+        value: (h) => completedOf(h.id).length,
+        render: (h) => (
+          <span className="font-mono font-medium whitespace-nowrap">
+            {completedOf(h.id).length} مكتملة ({totalOf(h.id).length} إجمالي)
+          </span>
+        ),
+      },
+      {
+        key: 'complianceRate',
+        header: 'معدل الامتثال',
+        type: 'number',
+        value: (h) => scoreOf(h.id),
+        render: (h) => {
+          const score = scoreOf(h.id);
+          if (score === null) return <span className="text-slate-400">—</span>;
+          return (
+            <span className="flex items-center gap-2">
+              <span className="font-mono font-bold text-xs">{score}%</span>
+              <span className="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden block">
+                <span className={`h-full rounded-full block ${scoreBarColor(score)}`} style={{ width: `${score}%` }} />
+              </span>
+            </span>
+          );
+        },
+      },
+      {
+        key: 'status',
+        header: 'الحالة',
+        value: (h) => (h.isActive ? 'مفعل نشط' : 'معطل'),
+        render: (h) => (
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
+              h.isActive
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}
+          >
+            {h.isActive ? 'مفعل نشط' : 'معطل'}
+          </span>
+        ),
+      },
+    ];
+  }, [visits]);
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
@@ -466,82 +552,15 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-100/70 text-slate-600 border-b border-slate-200 font-semibold">
-                <tr>
-                  <th className="py-3 px-4">اسم المستشفى</th>
-                  <th className="py-3 px-4">النوع والموقع</th>
-                  <th className="py-3 px-4">منسق مكافحة العدوى</th>
-                  <th className="py-3 px-4">الزيارات المنجزة</th>
-                  <th className="py-3 px-4">معدل الامتثال</th>
-                  <th className="py-3 px-4">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {hospitals.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
-                      لا توجد مستشفيات مسجلة حالياً
-                    </td>
-                  </tr>
-                ) : (
-                  hospitals.map((h) => {
-                    const hVisits = visits.filter((v) => v.hospitalId === h.id);
-                    const hCompleted = hVisits.filter((v) => v.status === 'completed');
-                    const score = averageCompliance(hCompleted.map((v) => v.complianceScore));
-
-                    return (
-                      <tr key={h.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 px-4 font-bold text-slate-900">{h.name}</td>
-                        <td className="py-3 px-4">
-                          <span className="block font-medium">{h.type}</span>
-                          <span className="text-[11px] text-slate-400">{h.location}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="block font-medium">{h.coordinator?.name ?? 'غير محدد'}</span>
-                          {h.coordinator?.email && (
-                            <span className="text-[11px] text-slate-400" dir="ltr">
-                              {h.coordinator.email}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 font-mono font-medium">
-                          {hCompleted.length} مكتملة ({hVisits.length} إجمالي)
-                        </td>
-                        <td className="py-3 px-4">
-                          {score === null ? (
-                            <span className="text-slate-400">—</span>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-xs">{score}%</span>
-                              <div className="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${scoreBarColor(score)}`}
-                                  style={{ width: `${score}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              h.isActive
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200'
-                            }`}
-                          >
-                            {h.isActive ? 'مفعل نشط' : 'معطل'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={hospitals}
+            columns={comparisonColumns}
+            rowKey={(h) => h.id}
+            searchPlaceholder="بحث بالمستشفى، النوع، الموقع، أو المنسق..."
+            emptyMessage="لا توجد مستشفيات مسجلة حالياً"
+            noMatchMessage="لا توجد مستشفيات مطابقة للبحث"
+            caption="لوحة المقارنة الشاملة بين المستشفيات"
+          />
         </div>
       )}
 
