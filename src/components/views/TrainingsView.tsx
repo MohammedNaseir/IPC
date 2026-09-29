@@ -78,7 +78,7 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
           <Link
             href={`/trainings/${t.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="font-bold text-slate-900 hover:text-teal-700 hover:underline"
+            className="font-bold text-slate-900 hover:text-navy-700 hover:underline"
           >
             {t.title}
           </Link>
@@ -186,11 +186,11 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>التطوير والتدريب</span>
             <span>/</span>
-            <span className="text-teal-700 font-medium">وحدة التدريب والتعليم المستمر</span>
+            <span className="text-navy-700 font-medium">وحدة التدريب والتعليم المستمر</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             إدارة البرامج والدورات التدريبية
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-200">
               {visibleCount ?? scopedTrainings.length} دورة مسجلة
             </span>
           </h2>
@@ -205,7 +205,7 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
           {isCentral && (
             <button
               onClick={() => setShowTemplateModal(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>قالب تدريبي مركزي</span>
@@ -217,7 +217,7 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
             disabled={hospitals.length === 0}
             className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50"
           >
-            <Plus className="w-4 h-4 text-teal-400" />
+            <Plus className="w-4 h-4 text-navy-400" />
             <span>تدريب داخلي مستقل</span>
           </button>
         </div>
@@ -295,16 +295,16 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-teal-400" />
+                <GraduationCap className="w-4 h-4 text-navy-400" />
                 إنشاء قالب تدريبي مركزي جديد
               </h3>
-              <button onClick={() => setShowTemplateModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowTemplateModal(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleTemplateSubmit} className="p-6 space-y-4 text-xs">
-              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-teal-900 leading-relaxed text-[11px]">
+              <div className="bg-navy-50 border border-navy-200 rounded-lg p-3 text-navy-900 leading-relaxed text-[11px]">
                 <strong className="block font-bold mb-1">آلية التوزيع والتعميم المعتمدة:</strong>
                 عند اعتماد هذا القالب، سيقوم النظام تلقائياً بتوليد نسخة فارغة مخصصة لكل مستشفى من مستشفيات التجمع ليقوم منسق كل مستشفى بتعبئة تفاصيل التنفيذ الخاصة به.
               </div>
@@ -351,7 +351,7 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   اعتماد القالب وتوزيعه آلياً
                 </button>
@@ -369,10 +369,10 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-teal-400" />
+                <Plus className="w-4 h-4 text-navy-400" />
                 إنشاء تدريب داخلي مستقل للمستشفى
               </h3>
-              <button onClick={() => setShowInternalModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowInternalModal(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -462,7 +462,7 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   حفظ التدريب الداخلي
                 </button>

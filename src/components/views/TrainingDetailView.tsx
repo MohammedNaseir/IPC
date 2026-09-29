@@ -170,7 +170,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
               <p className="text-[10px] text-slate-500">
                 أدخل اسم كل حاضر على حدة، أو استورد قائمة الأسماء من ملف. الأسماء نص حر وغير مرتبطة بسجل الممارسين.
               </p>
-              <span className="text-[11px] text-teal-700 font-bold shrink-0">{names.length} اسماً</span>
+              <span className="text-[11px] text-navy-700 font-bold shrink-0">{names.length} اسماً</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -193,13 +193,13 @@ function ExecutionForm({ training }: ExecutionFormProps) {
                 onClick={addName}
                 className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
               >
-                <Plus className="w-3.5 h-3.5 text-teal-400" />
+                <Plus className="w-3.5 h-3.5 text-navy-400" />
                 <span>إضافة</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowImport(true)}
-                className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+                className="px-3 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>استيراد من Excel</span>
@@ -207,8 +207,8 @@ function ExecutionForm({ training }: ExecutionFormProps) {
             </div>
 
             {summary && (
-              <div className="bg-white border border-teal-200 rounded-lg p-2.5 text-[11px] text-slate-700 space-y-1">
-                <p className="font-bold text-teal-800">
+              <div className="bg-white border border-navy-200 rounded-lg p-2.5 text-[11px] text-slate-700 space-y-1">
+                <p className="font-bold text-navy-800">
                   تم استيراد {summary.imported} اسماً، وتم تجاوز {summary.skipped} صفاً.
                 </p>
                 {summary.skippedReasons.blank > 0 && <p>الصفوف الفارغة المتجاوزة: {summary.skippedReasons.blank}</p>}
@@ -223,7 +223,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
             )}
 
             {names.length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-3">لم يتم إدخال أي اسم بعد</p>
+              <p className="text-[11px] text-muted text-center py-3">لم يتم إدخال أي اسم بعد</p>
             ) : (
               <div className="max-h-60 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
                 {names.map((name, index) => (
@@ -236,7 +236,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
                       type="button"
                       onClick={() => removeName(index)}
                       title="إزالة"
-                      className="text-slate-400 hover:text-rose-600 shrink-0"
+                      className="text-muted hover:text-danger-700 shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -268,10 +268,10 @@ function ExecutionForm({ training }: ExecutionFormProps) {
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Upload className="w-4 h-4 text-teal-400" />
+                <Upload className="w-4 h-4 text-navy-400" />
                 استيراد أسماء الحاضرين
               </h3>
-              <button type="button" onClick={() => setShowImport(false)} className="text-slate-400 hover:text-white">
+              <button type="button" onClick={() => setShowImport(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -284,7 +284,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
                 </p>
                 <a
                   href="/api/templates/attendance-names"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-teal-200 text-teal-700 rounded-lg font-bold text-[11px] hover:bg-teal-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-navy-200 text-navy-700 rounded-lg font-bold text-[11px] hover:bg-navy-50"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>تنزيل القالب (CSV يفتح في Excel)</span>
@@ -300,7 +300,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
                   onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
                   className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">
+                <p className="text-[10px] text-muted mt-1">
                   الأنواع المدعومة: xlsx أو csv — الحد الأقصى 8 ميجابايت و {MAX_ATTENDEE_NAMES} اسماً.
                 </p>
               </div>
@@ -313,7 +313,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
                   type="button"
                   onClick={handleImport}
                   disabled={isPending || !importFile}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   استيراد الأسماء
                 </button>
@@ -349,7 +349,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
         <button
           type="submit"
           disabled={isPending}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold flex items-center gap-2 shadow-xs transition-colors disabled:opacity-60"
+          className="px-5 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold flex items-center gap-2 shadow-xs transition-colors disabled:opacity-60"
         >
           <CheckCircle2 className="w-4 h-4" />
           <span>اعتماد توثيق التدريب وتحديث الحالة لمكتمل</span>
@@ -373,13 +373,13 @@ export function TrainingDetailView({ training }: TrainingDetailViewProps) {
       <div className="no-print flex items-center gap-2 text-xs text-slate-500">
         <Link
           href="/trainings"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-teal-700 hover:border-teal-300 transition-colors font-medium"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-navy-700 hover:border-navy-300 transition-colors font-medium"
         >
           <ArrowLeft className="w-3.5 h-3.5 rotate-180" aria-hidden="true" />
           <span>العودة لسجل التدريب</span>
         </Link>
         <span aria-hidden="true">/</span>
-        <span className="text-teal-700 font-medium truncate">{training.title}</span>
+        <span className="text-navy-700 font-medium truncate">{training.title}</span>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden p-6 space-y-6">
@@ -408,24 +408,24 @@ export function TrainingDetailView({ training }: TrainingDetailViewProps) {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
           <div>
-            <span className="text-slate-400 block text-[10px]">تاريخ التنفيذ</span>
+            <span className="text-muted block text-[10px]">تاريخ التنفيذ</span>
             <strong className="font-bold text-slate-800">
               {training.date ? formatDate(training.date) : 'لم يحدد بعد'}
             </strong>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px]">المدرب المنفذ</span>
+            <span className="text-muted block text-[10px]">المدرب المنفذ</span>
             <strong className="font-bold text-slate-800 truncate block">{training.deliveredBy || 'غير محدد'}</strong>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px]">عدد الحضور الموثق</span>
-            <strong className="font-bold text-teal-700 font-mono text-sm">{training.attendeeCount} حاضر</strong>
-            <span className="text-[10px] text-slate-400 block mt-0.5">
+            <span className="text-muted block text-[10px]">عدد الحضور الموثق</span>
+            <strong className="font-bold text-navy-700 font-mono text-sm">{training.attendeeCount} حاضر</strong>
+            <span className="text-[10px] text-muted block mt-0.5">
               {training.attendeeNames.length > 0 ? 'مسجل بالأسماء' : 'إجمالي العدد بدون أسماء'}
             </span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px]">الموعد النهائي</span>
+            <span className="text-muted block text-[10px]">الموعد النهائي</span>
             <strong className="font-bold text-slate-800">
               {training.dueDate ? formatDate(training.dueDate) : 'مفتوح'}
             </strong>
@@ -435,7 +435,7 @@ export function TrainingDetailView({ training }: TrainingDetailViewProps) {
         {training.attachments.length > 0 && (
           <div>
             <h3 className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
-              <Paperclip className="w-3.5 h-3.5 text-teal-600" />
+              <Paperclip className="w-3.5 h-3.5 text-navy-700" />
               مرفقات وصور توثيق التدريب
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -445,20 +445,20 @@ export function TrainingDetailView({ training }: TrainingDetailViewProps) {
                   href={att.file.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs overflow-hidden hover:border-teal-400 transition-colors"
+                  className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs overflow-hidden hover:border-navy-400 transition-colors"
                 >
                   <div className="h-24 w-full rounded bg-slate-200 mb-2 overflow-hidden flex items-center justify-center">
                     {att.file.mimeType.startsWith('image/') ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={att.file.url} alt={att.file.name} className="h-full w-full object-cover" />
                     ) : (
-                      <FileCheck className="w-8 h-8 text-slate-400" />
+                      <FileCheck className="w-8 h-8 text-muted" />
                     )}
                   </div>
                   <p className="font-medium text-slate-800 text-[11px] truncate" title={att.file.name}>
                     {att.file.name}
                   </p>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">{formatDate(att.uploadedAt)}</span>
+                  <span className="text-[10px] text-muted block mt-0.5">{formatDate(att.uploadedAt)}</span>
                 </a>
               ))}
             </div>
@@ -468,15 +468,15 @@ export function TrainingDetailView({ training }: TrainingDetailViewProps) {
         <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex items-center gap-2">
-              <FileCheck className="w-5 h-5 text-teal-600 shrink-0" />
+              <FileCheck className="w-5 h-5 text-navy-700 shrink-0" />
               <div>
                 <h3 className="text-xs font-bold text-slate-800">توثيق تنفيذ التدريب ورصد الحضور</h3>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted">
                   يقوم منسق المستشفى بتعبئة نسخته بالموعد والمدرب وقائمة الحضور والصور
                 </p>
               </div>
             </div>
-            <span className="text-[11px] bg-teal-50 text-teal-700 font-bold px-2 py-0.5 rounded shrink-0">
+            <span className="text-[11px] bg-navy-50 text-navy-700 font-bold px-2 py-0.5 rounded shrink-0">
               توثيق إلكتروني
             </span>
           </div>

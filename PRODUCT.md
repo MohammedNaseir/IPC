@@ -87,9 +87,14 @@ Confirmed by the owner on 2026-09-28:
   a private domain, not `.gov.sa`.
 - **Do not invent a logo or emblem.** The text wordmark stays until real assets are supplied. No logo or
   colour assets exist today; `public/` is empty.
-- **The palette is open**, but should resolve to one restrained institutional colour rather than the
-  current mix of two borrowed systems (an Apple-derived teal content area over a dark admin-template
-  sidebar carrying that template's blue/green/red/purple accents).
+- **The palette is settled (2026-09-29): ink navy, hue 254.** It replaced a mix of two borrowed systems
+  (an Apple-derived teal content area over a dark admin-template sidebar carrying that template's
+  blue/green/red/purple accents). The register is "official record": paper surfaces, chrome that
+  recedes, colour that is earned. Three meanings carry colour and nothing else does — navy for action,
+  selection, wayfinding and the sealed record; ochre for a record awaiting someone; red for failure,
+  error and the one irreversible act. **The green family is deliberately unused**: Saudi MoH and the
+  national identity are green, and an institutional green here would edge toward the borrowed authority
+  the constraint above forbids. Ramps and semantic roles live in `src/app/globals.css`.
 - **Arabic RTL only, formal Arabic copy, Tajawal stays.**
 
 Name in use: منصة إدارة مكافحة العدوى — IPC Cluster Portal. Voice is formal institutional Arabic.

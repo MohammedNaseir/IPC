@@ -24,9 +24,9 @@ export function TableEmptyState({ variant, message }: TableEmptyStateProps) {
   const Icon = variant === 'empty' ? Inbox : SearchX;
   return (
     <div className="py-12 px-6 text-center" dir="rtl">
-      <Icon className="w-8 h-8 text-slate-300 mx-auto mb-3" aria-hidden="true" />
+      <Icon className="w-8 h-8 text-navy-500 mx-auto mb-3" aria-hidden="true" />
       <p className="text-xs font-semibold text-slate-500">{message ?? DEFAULTS[variant]}</p>
-      <p className="text-[11px] text-slate-400 mt-1">{HINTS[variant]}</p>
+      <p className="text-[11px] text-muted mt-1">{HINTS[variant]}</p>
     </div>
   );
 }

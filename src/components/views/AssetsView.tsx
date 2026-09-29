@@ -65,26 +65,26 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
         value: (p) => p.name,
         render: (p) => (
           <span className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700 font-bold text-[10px] shrink-0">
+            <span className="w-6 h-6 rounded-lg bg-navy-50 border border-navy-100 flex items-center justify-center text-navy-700 font-bold text-[10px] shrink-0">
               {p.name.slice(0, 1)}
             </span>
             <span className="font-bold text-slate-900">{p.name}</span>
           </span>
         ),
       },
-      { key: 'role', header: 'المسمى الوظيفي', value: (p) => p.role, render: (p) => <span className="text-teal-700 font-medium">{p.role}</span> },
+      { key: 'role', header: 'المسمى الوظيفي', value: (p) => p.role, render: (p) => <span className="text-navy-700 font-medium">{p.role}</span> },
       {
         key: 'licenseNumber',
         header: 'رقم رخصة الهيئة (SCFHS)',
         value: (p) => p.licenseNumber,
-        render: (p) => <span className="font-mono">{p.licenseNumber ?? <span className="text-slate-300">—</span>}</span>,
+        render: (p) => <span className="font-mono">{p.licenseNumber ?? <span className="text-muted">—</span>}</span>,
       },
       { key: 'hospitalName', header: 'المنشأة التابع لها', value: (p) => p.hospitalName },
       {
         key: 'email',
         header: 'البريد الإلكتروني',
         value: (p) => p.email,
-        render: (p) => <span className="font-mono text-[10px] text-slate-500">{p.email ?? <span className="text-slate-300">—</span>}</span>,
+        render: (p) => <span className="font-mono text-[10px] text-slate-500">{p.email ?? <span className="text-muted">—</span>}</span>,
         hideBelowMd: true,
       },
     ],
@@ -99,17 +99,17 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
         value: (e) => e.name,
         render: (e) => (
           <span className="flex items-center gap-2">
-            <Wrench className="w-3.5 h-3.5 text-indigo-600 shrink-0" aria-hidden="true" />
+            <Wrench className="w-3.5 h-3.5 text-navy-700 shrink-0" aria-hidden="true" />
             <span className="font-bold text-slate-900">{e.name}</span>
           </span>
         ),
       },
-      { key: 'type', header: 'نوع الجهاز', value: (e) => e.type, render: (e) => <span className="text-indigo-700 font-medium">{e.type}</span> },
+      { key: 'type', header: 'نوع الجهاز', value: (e) => e.type, render: (e) => <span className="text-navy-700 font-medium">{e.type}</span> },
       {
         key: 'serialNumber',
         header: 'الرقم التسلسلي (SN)',
         value: (e) => e.serialNumber,
-        render: (e) => <span className="font-mono">{e.serialNumber ?? <span className="text-slate-300">—</span>}</span>,
+        render: (e) => <span className="font-mono">{e.serialNumber ?? <span className="text-muted">—</span>}</span>,
       },
       { key: 'hospitalName', header: 'المنشأة', value: (e) => e.hospitalName },
       {
@@ -121,14 +121,14 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
             <span
               className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                 e.status === EQUIPMENT_STATUSES[0]
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                  ? 'bg-navy-50 text-navy-700 border-navy-200'
+                  : 'bg-attn-50 text-attn-700 border-attn-200'
               }`}
             >
               {e.status}
             </span>
           ) : (
-            <span className="text-slate-300">—</span>
+            <span className="text-muted">—</span>
           ),
       },
       {
@@ -235,11 +235,11 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>المنشآت والأصول</span>
             <span>/</span>
-            <span className="text-teal-700 font-medium">الممارسون والأجهزة</span>
+            <span className="text-navy-700 font-medium">الممارسون والأجهزة</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             قاعدة بيانات الكوادر والأجهزة الطبية
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-200">
               سجل معتمد
             </span>
           </h2>
@@ -253,7 +253,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
             <button
               onClick={handleOpenAddPrac}
               disabled={hospitals.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               <span>إضافة ممارس صحي</span>
@@ -262,7 +262,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
             <button
               onClick={handleOpenAddEq}
               disabled={hospitals.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold shadow-xs transition-all disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               <span>إضافة جهاز / معدة</span>
@@ -279,7 +279,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
               activeTab === 'practitioners' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Users2 className="w-4 h-4 text-teal-600" />
+            <Users2 className="w-4 h-4 text-navy-700" />
             <span>الممارسون الصحيون ({practitioners.length})</span>
           </button>
 
@@ -289,7 +289,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
               activeTab === 'equipments' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Wrench className="w-4 h-4 text-indigo-600" />
+            <Wrench className="w-4 h-4 text-navy-700" />
             <span>أجهزة ومعدات مكافحة العدوى ({equipments.length})</span>
           </button>
         </div>
@@ -347,7 +347,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
               <h3 className="font-bold text-sm text-white">
                 {editingPrac ? 'تعديل بيانات الممارس الصحي' : 'إضافة ممارس صحي جديد'}
               </h3>
-              <button onClick={closePracModal} className="text-slate-400 hover:text-white">
+              <button onClick={closePracModal} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -405,7 +405,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
                   ))}
                 </select>
                 {!isCentral && (
-                  <span className="text-[10px] text-teal-700 mt-1 block">
+                  <span className="text-[10px] text-navy-700 mt-1 block">
                     محدد تلقائياً وفقاً للمستشفى التابع لحسابك كمنسق
                   </span>
                 )}
@@ -441,7 +441,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   {editingPrac ? 'حفظ التعديلات' : 'إضافة الممارس'}
                 </button>
@@ -458,7 +458,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
               <h3 className="font-bold text-sm text-white">
                 {editingEq ? 'تعديل بيانات الجهاز' : 'إضافة جهاز جديد لمكافحة العدوى'}
               </h3>
-              <button onClick={closeEqModal} className="text-slate-400 hover:text-white">
+              <button onClick={closeEqModal} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -516,7 +516,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
                   ))}
                 </select>
                 {!isCentral && (
-                  <span className="text-[10px] text-teal-700 mt-1 block">
+                  <span className="text-[10px] text-navy-700 mt-1 block">
                     محدد تلقائياً وفقاً للمستشفى التابع لحسابك كمنسق
                   </span>
                 )}
@@ -555,7 +555,7 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   {editingEq ? 'حفظ التعديلات' : 'إضافة الجهاز'}
                 </button>

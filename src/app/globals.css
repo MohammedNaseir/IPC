@@ -1,17 +1,67 @@
 @import "tailwindcss";
 
+/*
+  Palette — one institutional hue, decided by the owner on 2026-09-29.
+
+  The portal is a private cluster system on a private domain (PRODUCT.md, Brand Commitments). It borrows
+  no external identity: no emblem, no government trust mark, no imitation of MoH or Absher branding.
+  The green family is deliberately unused — Saudi MoH and the national identity are green, and an
+  institutional green here would edge toward exactly the borrowed authority the brand constraint forbids.
+
+  The hue is ink navy. The register is "official record": paper and ink, chrome that recedes, colour that
+  is earned rather than applied. Three meanings carry colour and nothing else does:
+
+    navy    the product's own colour — action, selection, wayfinding, and the sealed record
+    attn    a record that needs someone: pending, awaiting a response, in progress
+    danger  failure, error, and the irreversible act (archiving a visit). Nothing decorative is red.
+
+  Ramps are generated in OKLCH at hue 254 (navy), 75/68 (ochre) and 25 (red), with chroma reduced near
+  white and black so no step sits at high chroma where it cannot. Values are written as hex because
+  Tailwind v4 resolves them into class names; the OKLCH origin is what keeps the lightness steps even.
+
+  Every pair this project actually ships was measured, not eyeballed. Text clears 4.5:1 at the 10-12px
+  sizes in use, and focus indicators clear 3:1 against the surface they are drawn on.
+*/
+
 @theme {
-  --color-primary: #0066cc;
-  --color-primary-focus: #0071e3;
-  --color-primary-dark: #2997ff;
-  --color-ink: #1d1d1f;
+  /* Ink navy — the institutional hue. */
+  --color-navy-50: #f4f7fb;
+  --color-navy-100: #e7edf6;
+  --color-navy-200: #d1deee;
+  --color-navy-300: #b0c5de;
+  --color-navy-400: #86a3c6;
+  --color-navy-500: #5f83ae;
+  --color-navy-600: #426896;
+  --color-navy-700: #2e5079;
+  --color-navy-800: #1e3a5c;
+  --color-navy-900: #152941;
+  --color-navy-950: #0a1828;
+
+  /* Attention — a record waiting on someone. Ochre, not yellow: it has to sit on paper. */
+  --color-attn-50: #fef5ea;
+  --color-attn-100: #fdead0;
+  --color-attn-200: #f8d4a8;
+  --color-attn-700: #935f1a;
+  --color-attn-800: #794b12;
+  --color-attn-900: #613b12;
+
+  /* Failure, error, and the irreversible act. Used nowhere else. */
+  --color-danger-50: #fff2f1;
+  --color-danger-100: #ffe4e1;
+  --color-danger-200: #facdc8;
+  --color-danger-600: #ac3534;
+  --color-danger-700: #902828;
+  --color-danger-800: #762221;
+  --color-danger-900: #5d1c1b;
+
+  /* Semantic roles. Prefer these over a raw ramp step when the meaning is one of these five. */
+  --color-surface: #ffffff;
+  --color-raised: #f6f8fb;
+  --color-ink: #14203a;
+  --color-muted: #5b6880;
+  --color-line: #dfe4ec;
+
   --color-canvas: #ffffff;
-  --color-parchment: #f5f5f7;
-  --color-pearl: #fafafc;
-  --color-tile-1: #272729;
-  --color-tile-2: #2a2a2c;
-  --color-tile-3: #252527;
-  --color-surface-black: #000000;
 
   --font-display: var(--font-tajawal), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: var(--font-tajawal), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -33,6 +83,47 @@
     font-family: var(--font-display);
     letter-spacing: -0.015em;
   }
+
+  /*
+    The focus ring is a palette role, not a browser default. Before this, 49 of 54 components had no
+    focus utility at all and inherited the UA outline, whose colour is derived per element — it measured
+    as low as white-on-white against a filled button. One rule puts every focus stop under the palette.
+    The offset is drawn in the surface colour, so the ring always lands on paper rather than on a dark
+    control, which is what keeps it above 3:1 on both.
+  */
+  /*
+    Many controls carry `transition-colors`, whose property list includes outline-color. If the colour
+    only arrives with :focus-visible, the ring fades in from the element's own text colour — white, on a
+    filled button. Pinning outline-color on everything means only style and width change on focus, and
+    the ring appears at full strength immediately.
+  */
+  *,
+  ::before,
+  ::after {
+    outline-color: var(--color-navy-600);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-navy-600);
+    outline-offset: 2px;
+  }
+  /* Components that draw their own ring opt out of the global outline rather than stacking two. */
+  .focus-visible\:ring-2:focus-visible,
+  [class*="focus-visible:ring-"]:focus-visible {
+    outline: none;
+  }
+}
+
+/* Browser surfaces ship with defaults that belong to no design system. Theme them from the palette. */
+::selection {
+  background-color: var(--color-navy-100);
+  color: var(--color-ink);
+}
+
+input,
+textarea,
+[contenteditable] {
+  caret-color: var(--color-navy-700);
 }
 
 ::-webkit-scrollbar {
@@ -43,11 +134,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: color-mix(in oklab, var(--color-navy-800) 28%, transparent);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: color-mix(in oklab, var(--color-navy-800) 52%, transparent);
 }
 
 @media print {

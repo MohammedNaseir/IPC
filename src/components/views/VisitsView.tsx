@@ -69,7 +69,7 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
           <Link
             href={`/visits/${v.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="font-bold text-slate-900 hover:text-teal-700 hover:underline"
+            className="font-bold text-slate-900 hover:text-navy-700 hover:underline"
           >
             {v.hospitalName}
           </Link>
@@ -91,8 +91,8 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
           <span
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
               v.status === 'completed'
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                ? 'bg-navy-50 text-navy-700 border border-navy-200'
+                : 'bg-attn-50 text-attn-700 border border-attn-200'
             }`}
           >
             {v.status === 'completed' ? 'مكتمل ومؤرشف' : 'قيد المتابعة'}
@@ -107,9 +107,9 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
         value: (v) => v.complianceScore,
         render: (v) =>
           v.complianceScore === null ? (
-            <span className="text-slate-300">—</span>
+            <span className="text-muted">—</span>
           ) : (
-            <span className="font-mono font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded whitespace-nowrap">
+            <span className="font-mono font-bold text-navy-700 bg-navy-50 px-1.5 py-0.5 rounded whitespace-nowrap">
               {v.complianceScore}%
             </span>
           ),
@@ -188,11 +188,11 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>العمليات الرقابية</span>
             <span>/</span>
-            <span className="text-teal-700 font-medium">وحدة الزيارات الرقابية الميدانية</span>
+            <span className="text-navy-700 font-medium">وحدة الزيارات الرقابية الميدانية</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             سجل الزيارات والتدقيق الميداني
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-200">
               {visibleCount ?? scopedVisits.length} زيارة مسجلة
             </span>
           </h2>
@@ -205,7 +205,7 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
           <button
             onClick={openCreateModal}
             disabled={hospitals.length === 0}
-            className="no-print flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50"
+            className="no-print flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
             <span>إنشاء زيارة رقابية جديدة</span>
@@ -270,10 +270,10 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-teal-400" />
+                <Plus className="w-4 h-4 text-navy-400" />
                 إنشاء زيارة رقابية جديدة
               </h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowCreateModal(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -356,7 +356,7 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   حفظ وتوثيق الزيارة
                 </button>

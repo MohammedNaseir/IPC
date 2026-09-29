@@ -16,7 +16,7 @@ export function PortalShell({ user, notifications, children }: PortalShellProps)
 
   return (
     <div
-      className="min-h-screen bg-[var(--color-canvas)] text-[var(--color-ink)] font-sans antialiased selection:bg-[#0066cc] selection:text-white"
+      className="min-h-screen bg-surface text-ink font-sans antialiased"
       dir="rtl"
     >
       <Sidebar user={user} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
@@ -30,14 +30,14 @@ export function PortalShell({ user, notifications, children }: PortalShellProps)
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-32">{children}</main>
 
-        <footer className="h-12 border-t border-slate-200/80 bg-white px-6 flex items-center justify-between text-xs text-slate-500">
+        <footer className="h-12 border-t border-line bg-surface px-6 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span>منصة مكافحة العدوى الموحدة للتجمع الصحي</span>
             <span>•</span>
-            <span className="text-[11px] text-teal-700 font-medium">النسخة الرسمية المعتمدة v1.0</span>
+            <span className="text-[11px] text-navy-700 font-medium">النسخة الرسمية المعتمدة v1.0</span>
           </div>
-          <div className="text-[11px] text-slate-400">
-            <span className="text-emerald-700 font-medium">المنظومة متصلة ومحدثة</span>
+          <div className="text-[11px] text-muted">
+            <span className="text-muted font-medium">المنظومة متصلة ومحدثة</span>
           </div>
         </footer>
       </div>

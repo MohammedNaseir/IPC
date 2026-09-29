@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" className={tajawal.variable}>
-      <body className="bg-slate-50 text-slate-900 font-sans antialiased selection:bg-teal-500 selection:text-white">
+      <body className="bg-slate-50 text-slate-900 font-sans antialiased selection:bg-navy-600 selection:text-white">
         {children}
       </body>
     </html>

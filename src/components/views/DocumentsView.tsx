@@ -112,7 +112,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
     type: 'number',
     align: 'end',
     value: (row) => row.file.size,
-    render: (row) => <span className="font-mono text-slate-400">{formatFileSize(row.file.size)}</span>,
+    render: (row) => <span className="font-mono text-muted">{formatFileSize(row.file.size)}</span>,
     hideBelowMd: true,
   });
 
@@ -131,7 +131,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
       header: 'التصنيف',
       value: (p) => POLICY_CATEGORY_LABELS[p.category],
       render: (p) => (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-200 whitespace-nowrap">
           {POLICY_CATEGORY_LABELS[p.category]}
         </span>
       ),
@@ -139,7 +139,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
     { key: 'version', header: 'الإصدار', value: (p) => p.version, render: (p) => <span className="font-mono text-slate-500">إصدار {p.version}</span> },
     sizeColumn<PolicyDTO>(),
     uploadedAtColumn<PolicyDTO>('تاريخ الرفع'),
-    downloadColumn<PolicyDTO>('تحميل الوثيقة', 'hover:bg-teal-50 text-teal-700'),
+    downloadColumn<PolicyDTO>('تحميل الوثيقة', 'hover:bg-navy-50 text-navy-700'),
   ];
 
   const orgDocColumns: ColumnDef<OrgDocumentDTO>[] = [
@@ -149,7 +149,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
       value: (o) => o.title,
       render: (o) => (
         <span className="flex items-center gap-2">
-          <Network className="w-3.5 h-3.5 text-indigo-600 shrink-0" aria-hidden="true" />
+          <Network className="w-3.5 h-3.5 text-navy-700 shrink-0" aria-hidden="true" />
           <span className="font-bold text-slate-900">{o.title}</span>
         </span>
       ),
@@ -159,7 +159,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
       header: 'النوع',
       value: (o) => ORG_DOC_TYPE_LABELS[o.type],
       render: (o) => (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-200 whitespace-nowrap">
           {ORG_DOC_TYPE_LABELS[o.type]}
         </span>
       ),
@@ -167,7 +167,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
     { key: 'uploadedBy', header: 'تم الرفع بواسطة', value: (o) => o.uploadedBy ?? 'الإدارة المركزية' },
     sizeColumn<OrgDocumentDTO>(),
     uploadedAtColumn<OrgDocumentDTO>('تاريخ الرفع'),
-    downloadColumn<OrgDocumentDTO>('استعراض وتحميل', 'hover:bg-indigo-50 text-indigo-700'),
+    downloadColumn<OrgDocumentDTO>('استعراض وتحميل', 'hover:bg-navy-50 text-navy-700'),
   ];
 
   const docCenterColumns: ColumnDef<DocumentCenterFileDTO>[] = [
@@ -228,11 +228,11 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>المستودع المعرفي</span>
             <span>/</span>
-            <span className="text-teal-700 font-medium">{meta.title}</span>
+            <span className="text-navy-700 font-medium">{meta.title}</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             {meta.title}
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-200">
               {meta.srsRule}
             </span>
           </h2>
@@ -242,7 +242,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
         {isCentral && (
           <button
             onClick={openUploadModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+            className="flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
           >
             <Upload className="w-4 h-4" />
             <span>{meta.btnText}</span>
@@ -253,7 +253,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
       {moduleType === 'policies' && (
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-end gap-4">
           <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <Filter className="w-3.5 h-3.5 text-muted" />
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value as 'all' | PolicyCategory)}
@@ -311,10 +311,10 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Upload className="w-4 h-4 text-teal-400" />
+                <Upload className="w-4 h-4 text-navy-400" />
                 {meta.btnText}
               </h3>
-              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowUploadModal(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -385,9 +385,9 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
                   required
                   accept={FILE_ACCEPT}
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 file:ml-3 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-teal-50 file:text-teal-700 file:font-bold"
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 file:ml-3 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-navy-50 file:text-navy-700 file:font-bold"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-muted mt-1">
                   PDF، صور، مستندات Office أو CSV — الحد الأقصى 8 ميجابايت
                 </p>
               </div>
@@ -403,7 +403,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   {isPending ? 'جاري الرفع...' : 'تأكيد الرفع'}
                 </button>

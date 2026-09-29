@@ -64,7 +64,7 @@ export function AuditView({ auditLogs }: AuditViewProps) {
       key: 'performedBy',
       header: 'المنفذ',
       value: (log) => log.performedBy,
-      render: (log) => <span className="font-semibold text-teal-800">{log.performedBy}</span>,
+      render: (log) => <span className="font-semibold text-navy-800">{log.performedBy}</span>,
     },
     {
       key: 'timestamp',
@@ -77,7 +77,7 @@ export function AuditView({ auditLogs }: AuditViewProps) {
       key: 'entityId',
       header: 'معرف الكيان',
       value: (log) => log.entityId,
-      render: (log) => <span className="font-mono text-[10px] text-slate-400">#{log.entityId.slice(0, 10)}</span>,
+      render: (log) => <span className="font-mono text-[10px] text-muted">#{log.entityId.slice(0, 10)}</span>,
       hideBelowMd: true,
     },
   ];
@@ -104,11 +104,11 @@ export function AuditView({ auditLogs }: AuditViewProps) {
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>التدقيق والأمان</span>
             <span>/</span>
-            <span className="text-teal-700 font-medium">سجل التدقيق والتتبع التلقائي المعتمد</span>
+            <span className="text-navy-700 font-medium">سجل التدقيق والتتبع التلقائي المعتمد</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             سجل تدقيق العمليات الرقابية والتوثيق
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-200">
               {filteredLogs.length} عملية معروضة
             </span>
           </h2>
@@ -122,14 +122,14 @@ export function AuditView({ auditLogs }: AuditViewProps) {
           onClick={handleExportLogs}
           className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
         >
-          <FileSpreadsheet className="w-4 h-4 text-teal-400" />
+          <FileSpreadsheet className="w-4 h-4 text-navy-400" />
           <span>تصدير السجل (CSV)</span>
         </button>
       </div>
 
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-end gap-4">
         <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <Filter className="w-3.5 h-3.5 text-muted" />
           <select
             value={filterEntity}
             onChange={(e) => setFilterEntity(e.target.value)}

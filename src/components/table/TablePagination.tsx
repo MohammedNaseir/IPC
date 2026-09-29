@@ -54,7 +54,7 @@ export function TablePagination({
       <div className="flex items-center gap-3">
         <span className="text-slate-500" aria-live="polite">
           {filteredCount === 0 ? 'لا سجلات' : `${first}–${last} من ${filteredCount}`}
-          <span className="text-slate-400"> • صفحة {page} من {pageCount}</span>
+          <span className="text-muted"> • صفحة {page} من {pageCount}</span>
         </span>
 
         <nav className="flex items-center gap-1" aria-label="تنقل بين صفحات الجدول">

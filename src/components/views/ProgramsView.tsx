@@ -80,12 +80,12 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
       value: (row) => (row.kind === 'folder' ? 'مجلد' : 'ملف'),
       render: (row) =>
         row.kind === 'folder' ? (
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-200 whitespace-nowrap">
             <Folder className="w-3 h-3" aria-hidden="true" />
             مجلد
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
             <FileText className="w-3 h-3" aria-hidden="true" />
             ملف
           </span>
@@ -107,7 +107,7 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
         row.kind === 'folder' ? (
           <span className="block">
             {row.node.description && <span className="block text-slate-600 max-w-[18rem] truncate">{row.node.description}</span>}
-            <span className="text-[10px] text-slate-400">
+            <span className="text-[10px] text-muted">
               {row.childFolders} مجلد فرعي • {row.childFiles} ملف
             </span>
           </span>
@@ -124,7 +124,7 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
         row.kind === 'file' ? (
           <span className="whitespace-nowrap text-slate-500">{formatDate(row.item.uploadedAt)}</span>
         ) : (
-          <span className="text-slate-300">—</span>
+          <span className="text-muted">—</span>
         ),
       hideBelowMd: true,
     },
@@ -141,13 +141,13 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
             href={row.item.file.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-teal-50 text-teal-700 rounded-lg text-[11px] font-bold transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-navy-50 text-navy-700 rounded-lg text-[11px] font-bold transition-colors"
           >
             <Download className="w-3.5 h-3.5" aria-hidden="true" />
             <span>تحميل</span>
           </a>
         ) : (
-          <span className="text-slate-300">—</span>
+          <span className="text-muted">—</span>
         ),
     },
   ];
@@ -204,11 +204,11 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>المستودع المعرفي</span>
             <span>/</span>
-            <span className="text-teal-700 font-medium">البرامج والمشاريع الاستراتيجية</span>
+            <span className="text-navy-700 font-medium">البرامج والمشاريع الاستراتيجية</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             مستودع البرامج الاستراتيجية الشاملة
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-200">
               مستودع معتمد
             </span>
           </h2>
@@ -223,14 +223,14 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
               onClick={openFolderModal}
               className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
             >
-              <FolderPlus className="w-4 h-4 text-teal-400" />
+              <FolderPlus className="w-4 h-4 text-navy-400" />
               <span>{activeNodeId ? 'إنشاء مجلد فرعي' : 'إنشاء برنامج رئيسي'}</span>
             </button>
 
             {activeNodeId && (
               <button
                 onClick={openFileModal}
-                className="flex items-center gap-2 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+                className="flex items-center gap-2 px-3.5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
               >
                 <Upload className="w-4 h-4" />
                 <span>رفع ملف هنا</span>
@@ -248,7 +248,7 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
               setCurrentNodeId(null);
             }}
             className={`font-bold transition-colors ${
-              activeNodeId === null ? 'text-teal-700 underline' : 'text-slate-500 hover:text-slate-800'
+              activeNodeId === null ? 'text-navy-700 underline' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             البرامج الرئيسية (Root)
@@ -256,14 +256,14 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
 
           {breadcrumbs.map((crumb, idx) => (
             <Fragment key={crumb.id}>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400 rotate-180 shrink-0" />
+              <ChevronRight className="w-3.5 h-3.5 text-muted rotate-180 shrink-0" />
               <button
                 onClick={() => {
                   setShown(null);
                   setCurrentNodeId(crumb.id);
                 }}
                 className={`font-medium transition-colors ${
-                  idx === breadcrumbs.length - 1 ? 'text-teal-700 font-bold' : 'text-slate-500 hover:text-slate-800'
+                  idx === breadcrumbs.length - 1 ? 'text-navy-700 font-bold' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {crumb.name}
@@ -278,7 +278,7 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
               setShown(null);
               setCurrentNodeId(currentNode.parentId);
             }}
-            className="flex items-center gap-1 text-xs text-slate-600 hover:text-teal-700 font-medium px-2 py-1 rounded bg-slate-50 hover:bg-slate-100"
+            className="flex items-center gap-1 text-xs text-slate-600 hover:text-navy-700 font-medium px-2 py-1 rounded bg-slate-50 hover:bg-slate-100"
           >
             <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
             <span>رجوع للمستوى السابق</span>
@@ -311,10 +311,10 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <FolderPlus className="w-4 h-4 text-teal-400" />
+                <FolderPlus className="w-4 h-4 text-navy-400" />
                 {activeNodeId ? 'إنشاء مجلد فرعي للبرنامج' : 'إنشاء برنامج استراتيجي رئيسي'}
               </h3>
-              <button onClick={() => setShowFolderModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowFolderModal(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -354,7 +354,7 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   إنشاء المجلد
                 </button>
@@ -369,10 +369,10 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Upload className="w-4 h-4 text-teal-400" />
+                <Upload className="w-4 h-4 text-navy-400" />
                 رفع ملف داخل مجلد: {currentNode?.name}
               </h3>
-              <button onClick={() => setShowFileModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowFileModal(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -397,9 +397,9 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
                   required
                   accept={FILE_ACCEPT}
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 file:ml-3 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-teal-50 file:text-teal-700 file:font-bold"
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 file:ml-3 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-navy-50 file:text-navy-700 file:font-bold"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-muted mt-1">
                   PDF، صور، مستندات Office أو CSV — الحد الأقصى 8 ميجابايت
                 </p>
               </div>
@@ -415,7 +415,7 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold disabled:opacity-60"
+                  className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold disabled:opacity-60"
                 >
                   {isPending ? 'جاري الرفع...' : 'رفع وتأكيد الحفظ'}
                 </button>

@@ -2,9 +2,9 @@ import type { TrainingDTO } from '@/lib/types';
 
 // Shared by the trainings list and the training record page, which must badge a status identically.
 export function statusBadgeClass(status: TrainingDTO['status']): string {
-  if (status === 'completed') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-  if (status === 'late') return 'bg-rose-50 text-rose-700 border border-rose-200';
-  return 'bg-amber-50 text-amber-700 border border-amber-200';
+  if (status === 'completed') return 'bg-navy-50 text-navy-700 border border-navy-200';
+  if (status === 'late') return 'bg-danger-50 text-danger-700 border border-danger-200';
+  return 'bg-attn-50 text-attn-700 border border-attn-200';
 }
 
 export function statusLabel(status: TrainingDTO['status']): string {

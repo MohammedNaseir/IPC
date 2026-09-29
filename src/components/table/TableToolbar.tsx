@@ -29,15 +29,15 @@ export function TableToolbar({ query, onQueryChange, filteredCount, totalCount, 
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={placeholder ?? 'بحث في السجلات...'}
-          className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+          className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-muted focus:bg-white focus:ring-2 focus:ring-navy-600 focus:outline-none"
         />
-        <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" aria-hidden="true" />
+        <Search className="w-3.5 h-3.5 text-muted absolute right-2.5 top-2.5 pointer-events-none" aria-hidden="true" />
         {filtering && (
           <button
             type="button"
             onClick={() => onQueryChange('')}
             title="إلغاء البحث"
-            className="absolute left-2 top-2 p-0.5 text-slate-400 hover:text-slate-700 rounded"
+            className="absolute left-2 top-2 p-0.5 text-muted hover:text-slate-700 rounded"
           >
             <X className="w-3.5 h-3.5" />
             <span className="sr-only">إلغاء البحث</span>

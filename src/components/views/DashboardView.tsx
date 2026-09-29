@@ -28,7 +28,7 @@ interface DashboardViewProps {
 }
 
 function scoreBarColor(score: number): string {
-  return score >= 85 ? 'bg-teal-600' : score >= 75 ? 'bg-indigo-600' : 'bg-amber-500';
+  return score >= 85 ? 'bg-navy-800' : score >= 75 ? 'bg-navy-500' : 'bg-attn-700';
 }
 
 export function DashboardView({ user, hospitals, visits, trainings }: DashboardViewProps) {
@@ -97,7 +97,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
         render: (h) => (
           <span className="block">
             <span className="block font-medium">{h.type}</span>
-            <span className="text-[11px] text-slate-400">{h.location}</span>
+            <span className="text-[11px] text-muted">{h.location}</span>
           </span>
         ),
       },
@@ -109,7 +109,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           <span className="block">
             <span className="block font-medium">{h.coordinator?.name ?? 'غير محدد'}</span>
             {h.coordinator?.email && (
-              <span className="text-[11px] text-slate-400" dir="ltr">
+              <span className="text-[11px] text-muted" dir="ltr">
                 {h.coordinator.email}
               </span>
             )}
@@ -135,7 +135,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
         value: (h) => scoreOf(h.id),
         render: (h) => {
           const score = scoreOf(h.id);
-          if (score === null) return <span className="text-slate-400">—</span>;
+          if (score === null) return <span className="text-muted">—</span>;
           return (
             <span className="flex items-center gap-2">
               <span className="font-mono font-bold text-xs">{score}%</span>
@@ -154,8 +154,8 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
               h.isActive
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                ? 'bg-navy-50 text-navy-700 border border-navy-200'
+                : 'bg-slate-100 text-slate-600 border border-slate-200'
             }`}
           >
             {h.isActive ? 'مفعل نشط' : 'معطل'}
@@ -173,13 +173,13 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <span>الرئيسية</span>
             <span>/</span>
-            <span className="text-teal-700 font-medium">لوحة القيادة والمؤشرات</span>
+            <span className="text-navy-700 font-medium">لوحة القيادة والمؤشرات</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             {isCentral
               ? 'الداشبورد الموحد لمكافحة العدوى بالتجمع'
               : `داشبورد مؤشرات: ${currentHospital?.name ?? user.hospitalName ?? 'المستشفى'}`}
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-200">
               مؤشرات معتمدة
             </span>
           </h2>
@@ -203,7 +203,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           {isCentral && (
             <button
               onClick={() => setShowExportModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs"
               title="تصدير تحليل مؤشرات الأداء بصيغة Excel/CSV"
             >
               <Download className="w-3.5 h-3.5" />
@@ -215,19 +215,19 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
 
       {/* Alert Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-4 flex items-start justify-between">
+        <div className="bg-attn-50/70 border border-attn-200/80 rounded-xl p-4 flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-300 flex items-center justify-center text-amber-700 shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-attn-700/20 border border-attn-200 flex items-center justify-center text-attn-700 shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-xs font-bold text-amber-900">تنبيه التدريبات المتأخرة والمعلقة</h4>
-                <span className="bg-amber-200 text-amber-900 text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold">
+                <h4 className="text-xs font-bold text-attn-900">تنبيه التدريبات المتأخرة والمعلقة</h4>
+                <span className="bg-attn-200 text-attn-900 text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold">
                   {lateTrainings.length} متأخر
                 </span>
               </div>
-              <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+              <p className="text-xs text-attn-800 mt-1 leading-relaxed">
                 {lateTrainings.length > 0
                   ? `يوجد عدد (${lateTrainings.length}) تدريب متأخر عن الموعد النهائي المحدد من الإدارة المركزية بحاجة لتوثيق سريع.`
                   : trainings.length > 0
@@ -238,26 +238,26 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           </div>
           <Link
             href="/trainings"
-            className="text-xs font-bold text-amber-800 hover:text-amber-950 flex items-center gap-0.5 shrink-0"
+            className="text-xs font-bold text-attn-800 hover:text-attn-900 flex items-center gap-0.5 shrink-0"
           >
             <span>استعراض</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="bg-sky-50/70 border border-sky-200/80 rounded-xl p-4 flex items-start justify-between">
+        <div className="bg-navy-50/70 border border-navy-200/80 rounded-xl p-4 flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-sky-500/20 border border-sky-300 flex items-center justify-center text-sky-700 shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-navy-600/20 border border-navy-300 flex items-center justify-center text-navy-700 shrink-0">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-xs font-bold text-sky-900">الزيارات الرقابية القادمة والجارية</h4>
-                <span className="bg-sky-200 text-sky-900 text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold">
+                <h4 className="text-xs font-bold text-navy-900">الزيارات الرقابية القادمة والجارية</h4>
+                <span className="bg-navy-200 text-navy-900 text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold">
                   {inProgressVisits.length} زيارة
                 </span>
               </div>
-              <p className="text-xs text-sky-800 mt-1 leading-relaxed">
+              <p className="text-xs text-navy-800 mt-1 leading-relaxed">
                 {inProgressVisits.length > 0
                   ? `هناك (${inProgressVisits.length}) زيارة ميدانية قيد التنفيذ والمتابعة لتقييم معايير مكافحة العدوى.`
                   : 'لا توجد زيارات رقابية معلقة حالياً.'}
@@ -266,7 +266,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           </div>
           <Link
             href="/visits"
-            className="text-xs font-bold text-sky-800 hover:text-sky-950 flex items-center gap-0.5 shrink-0"
+            className="text-xs font-bold text-navy-800 hover:text-navy-950 flex items-center gap-0.5 shrink-0"
           >
             <span>متابعة</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -280,7 +280,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-slate-500">متوسط معدل الامتثال (KPI)</span>
-            <div className="w-9 h-9 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-navy-50 text-navy-700 flex items-center justify-center">
               <ShieldCheck className="w-5 h-5" />
             </div>
           </div>
@@ -289,15 +289,15 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
               {avgCompliance === null ? '—' : `${avgCompliance}%`}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-teal-500" />
+          <p className="text-[11px] text-muted mt-2 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-navy-600" />
             {avgCompliance === null
               ? 'لا توجد زيارات مكتملة بنسبة امتثال مسجلة بعد'
               : 'مشتق تلقائياً من نتائج الزيارات المكتملة'}
           </p>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
             <div
-              className="bg-teal-600 h-full rounded-full transition-all duration-500"
+              className="bg-navy-800 h-full rounded-full transition-all duration-500"
               style={{ width: `${avgCompliance ?? 0}%` }}
             />
           </div>
@@ -307,7 +307,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-slate-500">الزيارات الميدانية المنجزة</span>
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-navy-50 text-navy-700 flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
@@ -315,14 +315,14 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
             <span className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">
               {completedVisits.length}
             </span>
-            <span className="text-xs text-slate-400">من أصل {visits.length} زيارة</span>
+            <span className="text-xs text-muted">من أصل {visits.length} زيارة</span>
           </div>
           <p className="text-[11px] text-slate-500 mt-2">
             {inProgressVisits.length} زيارة قيد المتابعة والردود الميدانية
           </p>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
             <div
-              className="bg-indigo-600 h-full rounded-full"
+              className="bg-navy-800 h-full rounded-full"
               style={{ width: `${visits.length > 0 ? (completedVisits.length / visits.length) * 100 : 0}%` }}
             />
           </div>
@@ -332,7 +332,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-slate-500">نسبة إنجاز التدريب الإلزامي</span>
-            <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-navy-50 text-navy-700 flex items-center justify-center">
               <Award className="w-5 h-5" />
             </div>
           </div>
@@ -340,7 +340,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
             <span className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">
               {trainingCompletionRate === null ? '—' : `${trainingCompletionRate}%`}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-muted">
               ({completedTrainings.length}/{trainings.length})
             </span>
           </div>
@@ -353,7 +353,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           </p>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
             <div
-              className="bg-emerald-600 h-full rounded-full"
+              className="bg-navy-800 h-full rounded-full"
               style={{ width: `${trainingCompletionRate ?? 0}%` }}
             />
           </div>
@@ -373,7 +373,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
             <span className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">
               {isCentral ? hospitals.filter((h) => h.isActive).length : inProgressVisits.length}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-muted">
               {isCentral ? `من إجمالي ${hospitals.length}` : `من أصل ${visits.length} زيارة`}
             </span>
           </div>
@@ -410,17 +410,17 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
                   ? 'مقارنة نسب الامتثال بين المستشفيات'
                   : `مؤشرات الامتثال في الزيارات المكتملة (${currentHospital?.name ?? user.hospitalName ?? 'المنشأة'})`}
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted">
                 {isCentral
                   ? 'مشتقة من درجات التدقيق في الزيارات الرقابية المعتمدة عبر مرافق التجمع'
                   : 'درجات التدقيق المعتمدة الموثقة في تقييمات المنشأة'}
               </p>
             </div>
-            <span className="text-xs text-teal-700 font-medium bg-teal-50 px-2 py-0.5 rounded">تحديث فوري</span>
+            <span className="text-xs text-navy-700 font-medium bg-navy-50 px-2 py-0.5 rounded">تحديث فوري</span>
           </div>
 
           {chartData.length === 0 ? (
-            <div className="h-64 w-full flex items-center justify-center text-xs text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <div className="h-64 w-full flex items-center justify-center text-xs text-muted bg-slate-50 rounded-lg border border-dashed border-slate-200">
               لا توجد زيارات مكتملة بنسبة امتثال مسجلة لعرض المقارنة
             </div>
           ) : (
@@ -473,7 +473,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-sm text-slate-800">توزيع حالة التدريبات المطلوبة</h3>
-            <p className="text-xs text-slate-400">حالة القوالب التدريبية (معلّق / متأخر / مكتمل)</p>
+            <p className="text-xs text-muted">حالة القوالب التدريبية (معلّق / متأخر / مكتمل)</p>
           </div>
 
           <div className="py-4 flex items-center justify-center">
@@ -488,7 +488,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
                 />
                 {completedAngle > 0 && (
                   <path
-                    className="text-teal-600"
+                    className="text-navy-700"
                     strokeDasharray={`${completedAngle}, 100`}
                     strokeWidth="4.5"
                     strokeLinecap="round"
@@ -502,7 +502,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
                 <span className="text-2xl font-extrabold text-slate-900 font-mono">
                   {trainings.length === 0 ? '—' : `${Math.round(completedAngle)}%`}
                 </span>
-                <span className="text-[10px] text-slate-400 block font-medium">مكتمل</span>
+                <span className="text-[10px] text-muted block font-medium">مكتمل</span>
               </div>
             </div>
           </div>
@@ -510,24 +510,24 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           <div className="space-y-2 pt-3 border-t border-slate-100">
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 text-slate-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-teal-600" />
+                <span className="w-2.5 h-2.5 rounded-full bg-navy-800" />
                 مكتمل وموثق
               </span>
               <span className="font-mono font-bold text-slate-800">{completedTrainings.length}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 text-slate-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-attn-700" />
                 معلق بانتظار التوثيق
               </span>
               <span className="font-mono font-bold text-slate-800">{pendingTrainings.length}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 text-slate-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-danger-600" />
                 متأخر عن الموعد
               </span>
-              <span className="font-mono font-bold text-rose-600">{lateTrainings.length}</span>
+              <span className="font-mono font-bold text-danger-700">{lateTrainings.length}</span>
             </div>
           </div>
         </div>
@@ -545,7 +545,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
             </div>
             <Link
               href="/hospitals"
-              className="text-xs font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1"
+              className="text-xs font-bold text-navy-700 hover:text-navy-900 flex items-center gap-1"
             >
               <span>إدارة المستشفيات الكاملة</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -573,10 +573,10 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Download className="w-4 h-4 text-teal-400" />
+                <Download className="w-4 h-4 text-navy-400" />
                 تصدير تحليل مؤشرات الأداء (Excel)
               </h3>
-              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowExportModal(false)} className="text-muted hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -617,7 +617,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
                 >
                   إلغاء
                 </button>
-                <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold">
+                <button type="submit" className="px-5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-bold">
                   تصدير التقرير
                 </button>
               </div>

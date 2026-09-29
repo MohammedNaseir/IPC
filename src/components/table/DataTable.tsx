@@ -83,7 +83,7 @@ export function DataTable<T>({
   function cellContent(column: ColumnDef<T>, row: T) {
     if (column.render) return column.render(row);
     const value = column.value(row);
-    return value === null || value === '' ? <span className="text-slate-300">{DASH}</span> : value;
+    return value === null || value === '' ? <span className="text-muted">{DASH}</span> : value;
   }
 
   function rowActionsFor(row: T) {
@@ -128,13 +128,13 @@ export function DataTable<T>({
                         <button
                           type="button"
                           onClick={() => state.toggleSort(column.key)}
-                          className={`inline-flex items-center gap-1.5 rounded hover:text-teal-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
-                            active ? 'text-teal-800' : ''
+                          className={`inline-flex items-center gap-1.5 rounded hover:text-navy-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-600 ${
+                            active ? 'text-navy-800' : ''
                           }`}
                           title={`ترتيب حسب ${column.header}`}
                         >
                           <span>{column.header}</span>
-                          <Icon className={`w-3 h-3 ${active ? 'text-teal-700' : 'text-slate-400'}`} aria-hidden="true" />
+                          <Icon className={`w-3 h-3 ${active ? 'text-navy-700' : 'text-muted'}`} aria-hidden="true" />
                         </button>
                       ) : (
                         column.header
@@ -171,8 +171,8 @@ export function DataTable<T>({
                     }
                     tabIndex={selectable ? 0 : undefined}
                     aria-current={selected ? true : undefined}
-                    className={`transition-colors ${selectable ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500' : ''} ${
-                      selected ? 'bg-teal-50/60 ring-1 ring-inset ring-teal-500' : 'hover:bg-slate-50'
+                    className={`transition-colors ${selectable ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-navy-600' : ''} ${
+                      selected ? 'bg-navy-50/60 ring-1 ring-inset ring-navy-600' : 'hover:bg-slate-50'
                     }`}
                   >
                     {columns.map((column) => (
@@ -197,7 +197,7 @@ export function DataTable<T>({
                                 }}
                                 className={`p-1.5 rounded-lg border transition-colors ${
                                   action.tone === 'primary'
-                                    ? 'border-teal-200 text-teal-700 hover:bg-teal-50'
+                                    ? 'border-navy-200 text-navy-700 hover:bg-navy-50'
                                     : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                                 }`}
                               >
@@ -271,8 +271,8 @@ export function DataTable<T>({
                 }
                 tabIndex={selectable ? 0 : undefined}
                 aria-current={selected ? true : undefined}
-                className={`p-4 text-xs ${selectable ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500' : ''} ${
-                  selected ? 'bg-teal-50/60 ring-1 ring-inset ring-teal-500' : ''
+                className={`p-4 text-xs ${selectable ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-navy-600' : ''} ${
+                  selected ? 'bg-navy-50/60 ring-1 ring-inset ring-navy-600' : ''
                 }`}
               >
                 {first && (
@@ -285,7 +285,7 @@ export function DataTable<T>({
                 <dl className="space-y-1.5">
                   {rest.map((column) => (
                     <div key={column.key} className="flex items-start justify-between gap-3">
-                      <dt className="text-[11px] text-slate-400 shrink-0">{column.header}</dt>
+                      <dt className="text-[11px] text-muted shrink-0">{column.header}</dt>
                       <dd className="text-slate-700 text-left min-w-0">{cellContent(column, row)}</dd>
                     </div>
                   ))}
@@ -305,7 +305,7 @@ export function DataTable<T>({
                           }}
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-colors ${
                             action.tone === 'primary'
-                              ? 'border-teal-200 text-teal-700 hover:bg-teal-50'
+                              ? 'border-navy-200 text-navy-700 hover:bg-navy-50'
                               : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                           }`}
                         >
