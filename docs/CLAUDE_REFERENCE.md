@@ -117,6 +117,31 @@ Do **not** write a new card grid or a hand-rolled `<table>` for records — ther
 - Arabic collation note: ICU treats `آ` as a distinct letter from `أ`/`ا`, so `آ`-initial names sort before
   the others. Search normalisation unifies all three; sorting does not.
 
+### Per-record pages (feature 003)
+
+Visits and trainings each have their own page — `/visits/[id]` and `/trainings/[id]` — instead of a detail
+panel beside the list. The list screens keep the shared table; activating a row navigates.
+
+**The rule that matters, and the one to copy for any future per-record address:** a record reached by id
+is resolved with the caller's scope **inside the query's `where` clause**
+(`findFirst({ where: { id, ...hospitalScope(user) } })`), the fetcher returns `null` for "does not exist"
+and "not yours" alike, and the page calls `notFound()` before rendering anything. There is deliberately
+no branch between the two cases, because a page that 404s for a fabricated id but behaves differently for
+a real foreign record is an oracle for whether another hospital's record exists. Never fetch unscoped and
+compare afterwards — that is authorization after the fact, which Principle II forbids.
+
+Two more conventions from that feature:
+
+- **List state is restored, not addressable.** A list's URL stays constant as the user searches, sorts and
+  pages; returning from a record page restores the place from a client-side store keyed per table
+  (`src/components/table/listStateStore.ts`, opted into with `stateKey`). This was a deliberate product
+  decision — do not "fix" it by adding query parameters. The store is client-only: module state on the
+  server is shared across requests, so writing it there would leak one user's view state into another's
+  page. It resets on a hard reload, which is accepted.
+- **Row navigation is a real link plus row activation.** The primary cell carries an `<a>` so the
+  destination is announced as a navigation and supports middle-click and open-in-new-tab; the row stays
+  clickable and keyboard-activatable to the same address.
+
 ## 8. Known gaps (not implemented)
 
 - FR-35 **email** delivery (in-app notifications only; no mail provider in the spec).

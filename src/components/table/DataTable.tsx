@@ -28,6 +28,12 @@ export interface DataTableProps<T> {
   onStateChange?: (state: { filteredRows: T[]; filteredCount: number }) => void;
   /** Accessible name for the table element. */
   caption?: string;
+  /**
+   * Opts this instance into list-state restoration, keyed by this string (feature 003). The table's
+   * search, sort, page and page size are restored when it remounts — after a trip to a record page and
+   * back — instead of resetting. Inert when unset; two tables must never share a key.
+   */
+  stateKey?: string;
 }
 
 const DASH = '—';
@@ -47,9 +53,10 @@ export function DataTable<T>({
   isLoading = false,
   onStateChange,
   caption,
+  stateKey,
 }: DataTableProps<T>) {
   const instanceId = useId();
-  const state = useTableState(rows, columns, { initialSort: initialSort ?? null, pageSize });
+  const state = useTableState(rows, columns, { initialSort: initialSort ?? null, pageSize, stateKey });
   const { visibleRows, filteredRows, filteredCount, totalCount } = state;
 
   const visibleActions = actions?.length ? actions : null;

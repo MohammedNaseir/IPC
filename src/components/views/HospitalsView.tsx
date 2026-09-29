@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Building2,
   Plus,
@@ -53,6 +55,7 @@ interface EditingCoordinator {
 }
 
 export function HospitalsView({ hospitals, visits, trainings, practitioners, equipments }: HospitalsViewProps) {
+  const router = useRouter();
   const { run, isPending } = useActionRunner();
 
   const [activeSubTab, setActiveSubTab] = useState<'hospitals' | 'coordinators'>('hospitals');
@@ -431,7 +434,16 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
       header: 'تاريخ الزيارة',
       type: 'date',
       value: (v) => v.visitDate,
-      render: (v) => <span className="font-bold text-slate-800 whitespace-nowrap">{formatDate(v.visitDate)}</span>,
+      // A visit row opens a visit wherever a visit row appears (FR-017a).
+      render: (v) => (
+        <Link
+          href={`/visits/${v.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="font-bold text-slate-800 whitespace-nowrap hover:text-teal-700 hover:underline"
+        >
+          {formatDate(v.visitDate)}
+        </Link>
+      ),
     },
     { key: 'team', header: 'الفريق الزائر', value: (v) => v.team, render: (v) => <span className="text-slate-500">{v.team}</span> },
     {
@@ -448,7 +460,20 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
   ];
 
   const profileTrainingColumns: ColumnDef<TrainingDTO>[] = [
-    { key: 'title', header: 'البرنامج', value: (t) => t.title, render: (t) => <span className="font-bold text-slate-800">{t.title}</span> },
+    {
+      key: 'title',
+      header: 'البرنامج',
+      value: (t) => t.title,
+      render: (t) => (
+        <Link
+          href={`/trainings/${t.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="font-bold text-slate-800 hover:text-teal-700 hover:underline"
+        >
+          {t.title}
+        </Link>
+      ),
+    },
     {
       key: 'due',
       header: 'النوع / الاستحقاق',
@@ -695,6 +720,8 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                   rows={visits.filter((v) => v.hospitalId === selectedHospitalForProfile.id)}
                   columns={profileVisitColumns}
                   rowKey={(v) => v.id}
+                  onRowSelect={(v) => router.push(`/visits/${v.id}`)}
+                  stateKey="hospital-comprehensive-visits"
                   pageSize={10}
                   searchPlaceholder="بحث في الزيارات..."
                   emptyMessage="لا توجد زيارات رقابية مسجلة"
@@ -713,6 +740,8 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                   rows={trainings.filter((t) => t.hospitalId === selectedHospitalForProfile.id)}
                   columns={profileTrainingColumns}
                   rowKey={(t) => t.id}
+                  onRowSelect={(t) => router.push(`/trainings/${t.id}`)}
+                  stateKey="hospital-comprehensive-trainings"
                   pageSize={10}
                   searchPlaceholder="بحث في البرامج التدريبية..."
                   emptyMessage="لا توجد برامج تدريبية مسجلة"

@@ -10,6 +10,7 @@ import type {
   TrainingDTO,
   VisitDTO,
 } from '@/lib/types';
+import { useRouter } from 'next/navigation';
 import type { ColumnDef } from '@/lib/table';
 import { DataTable } from '@/components/table/DataTable';
 import { formatDate } from '@/lib/format';
@@ -35,6 +36,7 @@ export function HospitalProfileView({
   const hTrainings = trainings.filter((t) => t.hospitalId === hospital.id);
   const hPractitioners = practitioners.filter((p) => p.hospitalId === hospital.id);
   const hEquipments = equipments.filter((e) => e.hospitalId === hospital.id);
+  const router = useRouter();
 
   // The two record lists on this screen become narrow tables; the coordinator card, the facility summary
   // and the four count tiles above them are untouched.
@@ -44,7 +46,16 @@ export function HospitalProfileView({
       header: 'تاريخ الزيارة',
       type: 'date',
       value: (v) => v.visitDate,
-      render: (v) => <span className="font-bold text-slate-800 whitespace-nowrap">زيارة بتاريخ {formatDate(v.visitDate)}</span>,
+      // A visit row opens a visit wherever a visit row appears (FR-017a).
+      render: (v) => (
+        <Link
+          href={`/visits/${v.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="font-bold text-slate-800 whitespace-nowrap hover:text-teal-700 hover:underline"
+        >
+          زيارة بتاريخ {formatDate(v.visitDate)}
+        </Link>
+      ),
     },
     { key: 'team', header: 'الفريق الزائر', value: (v) => v.team, render: (v) => <span className="text-[11px] text-slate-500">{v.team}</span> },
     {
@@ -67,7 +78,20 @@ export function HospitalProfileView({
   ];
 
   const trainingColumns: ColumnDef<TrainingDTO>[] = [
-    { key: 'title', header: 'البرنامج', value: (t) => t.title, render: (t) => <span className="font-bold text-slate-800">{t.title}</span> },
+    {
+      key: 'title',
+      header: 'البرنامج',
+      value: (t) => t.title,
+      render: (t) => (
+        <Link
+          href={`/trainings/${t.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="font-bold text-slate-800 hover:text-teal-700 hover:underline"
+        >
+          {t.title}
+        </Link>
+      ),
+    },
     {
       key: 'due',
       header: 'النوع / الاستحقاق',
@@ -252,6 +276,8 @@ export function HospitalProfileView({
             rows={hVisits}
             columns={visitColumns}
             rowKey={(v) => v.id}
+            onRowSelect={(v) => router.push(`/visits/${v.id}`)}
+            stateKey="hospital-profile-visits"
             pageSize={10}
             searchPlaceholder="بحث في زيارات المستشفى..."
             emptyMessage="لا توجد زيارات رقابية مسجلة حالياً للمستشفى"
@@ -274,6 +300,8 @@ export function HospitalProfileView({
             rows={hTrainings}
             columns={trainingColumns}
             rowKey={(t) => t.id}
+            onRowSelect={(t) => router.push(`/trainings/${t.id}`)}
+            stateKey="hospital-profile-trainings"
             pageSize={10}
             searchPlaceholder="بحث في البرامج التدريبية..."
             emptyMessage="لا توجد برامج تدريبية مسجلة حالياً"

@@ -47,6 +47,34 @@ export interface SortState {
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 export const DEFAULT_PAGE_SIZE = 25;
 
+/**
+ * What a list remembers across a trip to a record page and back. Deliberately **not** carried in the
+ * address: a list's URL stays constant as the user searches, sorts and pages, so a shared or bookmarked
+ * list link opens the unfiltered list.
+ *
+ * The table owns `query`, `sort`, `page` and `pageSize`. `filters` belongs to the screen — its own
+ * status/hospital/type selects — and is written by the list view, under the same key, so the two halves
+ * cannot fall out of step.
+ */
+export interface ListViewState {
+  query: string;
+  sort: SortState | null;
+  page: number;
+  pageSize: number;
+  filters: Record<string, string>;
+}
+
+export interface TableStateOptions {
+  initialSort?: SortState | null;
+  pageSize?: number;
+  /**
+   * Opts this table instance into state restoration, keyed by this string. Inert when unset: no read,
+   * no write, no store entry. Two tables must never share a key — a collision silently hands one
+   * table's state to another.
+   */
+  stateKey?: string;
+}
+
 export function isColumnSearchable<T>(column: ColumnDef<T>): boolean {
   return column.searchable ?? (column.type ?? 'text') === 'text';
 }
