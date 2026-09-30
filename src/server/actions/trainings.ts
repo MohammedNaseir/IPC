@@ -56,7 +56,6 @@ const internalTrainingSchema = z.object({
   description: requiredText('تفاصيل التدريب', 10_000),
   date: dateSchema('تاريخ التنفيذ'),
   deliveredBy: optionalText(200),
-  attendeeCount: z.number().int('عدد المتدربين غير صالح.').min(1, 'عدد المتدربين يجب أن يكون 1 على الأقل.').max(100_000),
 });
 
 export async function createInternalTraining(input: z.input<typeof internalTrainingSchema>) {
@@ -69,6 +68,11 @@ export async function createInternalTraining(input: z.input<typeof internalTrain
       const hospital = await tx.hospital.findUnique({ where: { id: data.hospitalId }, select: { id: true } });
       if (!hospital) throw new NotFoundError('المستشفى المحدد غير موجود.');
 
+      // Created pending, with no attendance: the coordinator documents attendance afterward on
+      // the record page, by names or by a single total, exactly as a central-template training
+      // already works (D-003 in docs/CLAUDE_REFERENCE.md §9). This training can never derive
+      // `late` or raise an overdue reminder -- both read a template's dueDate, and an internal
+      // training has no template -- which is a recorded, accepted consequence, not a defect here.
       const training = await tx.training.create({
         data: {
           hospitalId: data.hospitalId,
@@ -76,11 +80,10 @@ export async function createInternalTraining(input: z.input<typeof internalTrain
           description: data.description,
           date: data.date,
           deliveredBy: data.deliveredBy,
-          status: 'completed',
-          attendances: { create: { headcount: data.attendeeCount } },
+          status: 'pending',
         },
       });
-      await logAudit(tx, actor, 'Training', training.id, `تسجيل تدريب داخلي مستقل: ${training.title}`);
+      await logAudit(tx, actor, 'Training', training.id, `إنشاء تدريب داخلي مستقل: ${training.title}`);
     });
 
     return null;

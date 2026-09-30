@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { notify } from '@/lib/notify';
 import {
   ShieldCheck,
   AlertTriangle,
@@ -66,7 +67,7 @@ export function DashboardView({ user, hospitals, visits, trainings }: DashboardV
   const handleExportSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!exportFrom || !exportTo || exportFrom > exportTo) {
-      window.alert('يرجى تحديد فترة زمنية صحيحة (تاريخ البداية قبل تاريخ النهاية).');
+      void notify.info('يرجى تحديد فترة زمنية صحيحة (تاريخ البداية قبل تاريخ النهاية).');
       return;
     }
     const params = new URLSearchParams({ from: exportFrom, to: exportTo });

@@ -29,10 +29,10 @@ export function TablePagination({
   const atEnd = page >= pageCount;
 
   const button =
-    'p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent';
+    'p-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent tabular-nums';
 
   return (
-    <div className="p-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px]">
+    <div className="p-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] tabular-nums">
       <div className="flex items-center gap-2 text-slate-500">
         <label htmlFor={selectId} className="font-medium">
           عدد السجلات في الصفحة
@@ -41,7 +41,7 @@ export function TablePagination({
           id={selectId}
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="p-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
+          className="p-1 bg-white border border-slate-300 rounded-lg text-slate-700"
         >
           {PAGE_SIZE_OPTIONS.map((size) => (
             <option key={size} value={size}>

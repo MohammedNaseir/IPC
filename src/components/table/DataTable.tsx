@@ -92,7 +92,9 @@ export function DataTable<T>({
 
   return (
     // A labelled region, so a screen with two tables announces which one the focus is in.
-    <section aria-label={caption ?? 'جدول السجلات'} className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden" dir="rtl">
+    // Printed-register treatment (item 7, T3): a flat, bordered page rather than a floating card --
+    // registers don't have drop shadows -- with a heavier rule doing the work a tinted header used to.
+    <section aria-label={caption ?? 'جدول السجلات'} className="bg-white rounded-lg border border-slate-300 overflow-hidden" dir="rtl">
       <TableToolbar
         query={state.query}
         onQueryChange={state.setQuery}
@@ -108,9 +110,12 @@ export function DataTable<T>({
         {/* Wide layout: a real table from the md breakpoint up (research.md R-004). Both layouts are
             rendered and chosen by CSS, so the first paint is correct and server and client markup agree. */}
         <div className="overflow-x-auto hidden md:block">
-          <table className="w-full text-right text-xs">
+          <table className="w-full text-right text-xs tabular-nums">
             {caption && <caption className="sr-only">{caption}</caption>}
-            <thead className="bg-slate-100/80 text-slate-600 border-b border-slate-200 font-semibold">
+            {/* No tinted fill -- the rule below does the separating, the way a printed register's
+                column heads sit on the same page as its entries. The rule is heavier than a body
+                divider, not the header's background, that marks it as the header. */}
+            <thead className="bg-white text-slate-600 border-b-2 border-slate-800 font-semibold">
               <tr>
                 {columns.map((column) => {
                   const sortable = isColumnSortable(column);
@@ -122,7 +127,7 @@ export function DataTable<T>({
                       key={column.key}
                       scope="col"
                       aria-sort={ariaSort}
-                      className={`py-3 px-4 whitespace-nowrap ${column.align === 'end' ? 'text-left' : ''}`}
+                      className={`py-2.5 px-4 whitespace-nowrap ${column.align === 'end' ? 'text-left' : ''}`}
                     >
                       {sortable ? (
                         <button
@@ -150,7 +155,9 @@ export function DataTable<T>({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            {/* Ruled between every entry, the way a register is ruled -- not zebra-striped, which
+                would be a colour doing a line's job. */}
+            <tbody className="divide-y divide-slate-200 text-slate-700">
               {visibleRows.map((row) => {
                 const key = rowKey(row);
                 const selected = selectedRowKey !== null && key === selectedRowKey;
@@ -172,7 +179,7 @@ export function DataTable<T>({
                     tabIndex={selectable ? 0 : undefined}
                     aria-current={selected ? true : undefined}
                     className={`transition-colors ${selectable ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-navy-600' : ''} ${
-                      selected ? 'bg-navy-50/60 ring-1 ring-inset ring-navy-600' : 'hover:bg-slate-50'
+                      selected ? 'bg-navy-50/60 ring-1 ring-inset ring-navy-600' : 'hover:bg-slate-50/80'
                     }`}
                   >
                     {columns.map((column) => (
@@ -219,7 +226,7 @@ export function DataTable<T>({
         {/* Narrow layout: one card per record, each field a label/value pair so no value loses its label
             (FR-022). Columns marked hideBelowMd are omitted (FR-015). No horizontal page scrolling. */}
         {/* There are no column headers to activate on a card, so sorting gets its own control here. */}
-        <div className="md:hidden px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2 text-[11px]">
+        <div className="md:hidden px-4 py-2.5 bg-white border-b-2 border-slate-800 flex items-center gap-2 text-[11px]">
           <label htmlFor={`${instanceId}-sort`} className="text-slate-500 shrink-0">
             ترتيب حسب
           </label>
@@ -227,7 +234,7 @@ export function DataTable<T>({
             id={`${instanceId}-sort`}
             value={state.sort?.key ?? ''}
             onChange={(e) => (e.target.value ? state.toggleSort(e.target.value) : state.clearSort())}
-            className="flex-1 min-w-0 p-1 bg-white border border-slate-200 rounded-lg text-slate-700"
+            className="flex-1 min-w-0 p-1 bg-white border border-slate-300 rounded-lg text-slate-700"
           >
             <option value="">الترتيب الافتراضي</option>
             {columns.filter(isColumnSortable).map((column) => (
@@ -248,7 +255,7 @@ export function DataTable<T>({
           </button>
         </div>
 
-        <div className="md:hidden divide-y divide-slate-100">
+        <div className="md:hidden divide-y divide-slate-200 tabular-nums">
           {visibleRows.map((row) => {
             const key = rowKey(row);
             const selected = selectedRowKey !== null && key === selectedRowKey;

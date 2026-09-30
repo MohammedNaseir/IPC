@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { NotificationDTO, SessionUser } from '@/lib/types';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { Header } from '@/components/shell/Header';
+import { getCollapsedServerSnapshot, getCollapsedSnapshot, setCollapsed, subscribeToCollapsed } from '@/components/shell/sidebarStore';
 
 interface PortalShellProps {
   user: SessionUser;
@@ -14,14 +15,25 @@ interface PortalShellProps {
 export function PortalShell({ user, notifications, children }: PortalShellProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  // Owned here, not inside Sidebar, because the content column's own margin (item 5, direction S1)
+  // has to shrink in step with the rail or the reclaimed space is wasted as a dead gap.
+  const collapsed = useSyncExternalStore(subscribeToCollapsed, getCollapsedSnapshot, getCollapsedServerSnapshot);
+  const toggleCollapsed = () => setCollapsed(!collapsed);
+
   return (
     <div
       className="min-h-screen bg-surface text-ink font-sans antialiased"
       dir="rtl"
     >
-      <Sidebar user={user} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
+      <Sidebar
+        user={user}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
+      />
 
-      <div className="lg:mr-64 flex flex-col min-h-screen transition-all">
+      <div className={`flex flex-col min-h-screen transition-[margin] duration-300 ease-in-out ${collapsed ? 'lg:mr-16' : 'lg:mr-64'}`}>
         <Header
           user={user}
           notifications={notifications}

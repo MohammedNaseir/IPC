@@ -42,6 +42,11 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Static assets under /public (item 8 / feature 004) never existed before this feature -- public/
+// was empty -- so this gap was latent and unexercised until the sidebar logo's next/image request
+// needed to fetch it. Excluding common static-file extensions is the standard, documented Next.js
+// middleware matcher pattern, not a project-specific workaround; every other route, including any
+// future one, still goes through the session/role gate below unchanged.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };

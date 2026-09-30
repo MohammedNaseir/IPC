@@ -23,6 +23,7 @@ import type { AuditLogDTO, SessionUser, VisitDTO } from '@/lib/types';
 import { formatDate, formatDateTime, formatFileSize } from '@/lib/format';
 import { addVisitAttachment, addVisitResponse, completeVisit, uploadVisitReport } from '@/server/actions/visits';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
+import { notify } from '@/lib/notify';
 
 interface VisitDetailViewProps {
   user: SessionUser;
@@ -100,8 +101,17 @@ export function VisitDetailView({ user, visit, auditLogs }: VisitDetailViewProps
     );
   };
 
-  const handleComplete = () => {
-    if (!window.confirm('هل تريد اعتماد الزيارة وإغلاقها نهائياً؟ لن يمكن تعديلها بعد الأرشفة.')) return;
+  const handleComplete = async () => {
+    // The product's one irreversible act (Constitution: Immutability). No second approver and no
+    // role check beyond the existing central-role one are introduced here — this is friction on a
+    // single click by the same user, not a review step (FR-012).
+    const proceed = await notify.confirm({
+      title: 'اعتماد الزيارة وإغلاقها نهائياً',
+      body: 'هل تريد اعتماد الزيارة وإغلاقها نهائياً؟ لن يمكن تعديلها بعد الأرشفة.',
+      confirmText: 'اعتماد وإغلاق',
+      danger: true,
+    });
+    if (!proceed) return;
     run(() => completeVisit(visit.id));
   };
 

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "sweetalert2/dist/sweetalert2.min.css";
 
 /*
   Palette — one institutional hue, decided by the owner on 2026-09-29.
@@ -63,7 +64,9 @@
 
   --color-canvas: #ffffff;
 
-  --font-display: var(--font-tajawal), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Cairo for headings and interface labels; Tajawal for body text and data (item 6, Q3). Both
+     apply everywhere through this token layer, without editing a single component (research.md R-002). */
+  --font-display: var(--font-cairo), var(--font-tajawal), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: var(--font-tajawal), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-sans: var(--font-tajawal), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -139,6 +142,99 @@ textarea,
 }
 ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in oklab, var(--color-navy-800) 52%, transparent);
+}
+
+/*
+  Notifications (item 3 / feature 004) — SweetAlert2 supplies structural behaviour only: backdrop,
+  centring, the built-in focus trap, and the open/close animation. `buttonsStyling: false` in
+  src/lib/notify.ts strips its default button colours, and every visual property below is drawn
+  from the product's own palette and type, never the library's theme (contracts/notify.md).
+
+  Icons are deliberately not used for any dialog kind, so this stylesheet never has to recolour
+  SweetAlert2's internal icon SVGs to avoid shipping their stock blue/orange/red circles.
+*/
+.swal2-popup.ipc-swal-popup {
+  font-family: var(--font-sans);
+  width: auto;
+  max-width: 28rem;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 20px 40px -12px rgba(10, 24, 40, 0.25);
+  direction: rtl;
+  text-align: right;
+}
+.swal2-popup.ipc-swal-popup.ipc-swal-popup--danger {
+  border-top: 4px solid var(--color-danger-700);
+}
+
+.swal2-title.ipc-swal-title {
+  font-family: var(--font-display);
+  padding: 0;
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.swal2-html-container.ipc-swal-body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--color-muted);
+}
+
+.swal2-actions.ipc-swal-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 1.25rem 0 0;
+}
+
+.swal2-confirm.ipc-swal-confirm {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--color-navy-800);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.swal2-confirm.ipc-swal-confirm:hover {
+  background: var(--color-navy-900);
+}
+.swal2-confirm.ipc-swal-confirm.ipc-swal-confirm--danger {
+  background: var(--color-danger-800);
+}
+.swal2-confirm.ipc-swal-confirm.ipc-swal-confirm--danger:hover {
+  background: var(--color-danger-900);
+}
+
+.swal2-cancel.ipc-swal-cancel {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  background: var(--color-raised);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.swal2-cancel.ipc-swal-cancel:hover {
+  background: var(--color-line);
+}
+
+.swal2-popup.ipc-swal-popup :focus-visible {
+  outline: 2px solid var(--color-navy-600);
+  outline-offset: 2px;
 }
 
 @media print {

@@ -18,7 +18,7 @@ export function TableToolbar({ query, onQueryChange, filteredCount, totalCount, 
   const filtering = query.trim() !== '';
 
   return (
-    <div className="p-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+    <div className="p-3.5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="relative flex-1 sm:max-w-sm">
         <label htmlFor={inputId} className="sr-only">
           بحث في السجلات
@@ -29,7 +29,7 @@ export function TableToolbar({ query, onQueryChange, filteredCount, totalCount, 
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={placeholder ?? 'بحث في السجلات...'}
-          className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-muted focus:bg-white focus:ring-2 focus:ring-navy-600 focus:outline-none"
+          className="w-full pl-8 pr-8 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 placeholder:text-muted focus:bg-white focus:ring-2 focus:ring-navy-600 focus:outline-none"
         />
         <Search className="w-3.5 h-3.5 text-muted absolute right-2.5 top-2.5 pointer-events-none" aria-hidden="true" />
         {filtering && (

@@ -44,7 +44,6 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
   const [internalDesc, setInternalDesc] = useState('');
   const [internalDate, setInternalDate] = useState(todayInputValue());
   const [internalDeliveredBy, setInternalDeliveredBy] = useState('');
-  const [internalCount, setInternalCount] = useState('');
 
   const rememberFilters = (next: { type?: string; status?: string; hospital?: string }) => {
     writeListFilters(LIST_KEY, {
@@ -167,14 +166,12 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
           description: internalDesc,
           date: internalDate,
           deliveredBy: internalDeliveredBy,
-          attendeeCount: Number(internalCount),
         }),
       () => {
         setShowInternalModal(false);
         setInternalTitle('');
         setInternalDesc('');
         setInternalDeliveredBy('');
-        setInternalCount('');
       },
     );
   };
@@ -420,27 +417,15 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">عدد المتدربين</label>
+                  <label className="block font-bold text-slate-700 mb-1">اسم المدرب</label>
                   <input
-                    type="number"
-                    min="1"
-                    required
-                    value={internalCount}
-                    onChange={(e) => setInternalCount(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-mono"
+                    type="text"
+                    placeholder="ممارس أو أخصائي مكافحة العدوى"
+                    value={internalDeliveredBy}
+                    onChange={(e) => setInternalDeliveredBy(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">اسم المدرب</label>
-                <input
-                  type="text"
-                  placeholder="ممارس أو أخصائي مكافحة العدوى"
-                  value={internalDeliveredBy}
-                  onChange={(e) => setInternalDeliveredBy(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"
-                />
               </div>
 
               <div>

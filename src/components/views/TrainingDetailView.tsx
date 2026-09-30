@@ -18,6 +18,7 @@ import { formatDate, todayInputValue } from '@/lib/format';
 import { statusBadgeClass, statusDetailLabel } from '@/lib/training-status';
 import { ATTENDEE_NAME_MAX_LENGTH, MAX_ATTENDEE_NAMES, type ImportSummary } from '@/lib/attendance';
 import { importAttendanceNames, recordTrainingExecution } from '@/server/actions/trainings';
+import { notify } from '@/lib/notify';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 
 interface ExecutionFormProps {
@@ -45,15 +46,25 @@ function ExecutionForm({ training }: ExecutionFormProps) {
   const [importKey, setImportKey] = useState(0);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
 
-  const switchMode = (next: 'names' | 'headcount') => {
+  const switchMode = async (next: 'names' | 'headcount') => {
     if (next === mode) return;
     const losingNames = next === 'headcount' && names.length > 0;
     const losingHeadcount = next === 'names' && headcount.trim() !== '';
-    if (losingNames && !window.confirm(`سيتم استبدال قائمة الأسماء (${names.length} اسماً) بإجمالي العدد. هل تريد المتابعة؟`)) {
-      return;
+    if (losingNames) {
+      const proceed = await notify.confirm({
+        title: 'استبدال قائمة الأسماء',
+        body: `سيتم استبدال قائمة الأسماء (${names.length} اسماً) بإجمالي العدد. هل تريد المتابعة؟`,
+        confirmText: 'استبدال',
+      });
+      if (!proceed) return;
     }
-    if (losingHeadcount && !window.confirm('سيتم استبدال إجمالي العدد بقائمة أسماء الحاضرين. هل تريد المتابعة؟')) {
-      return;
+    if (losingHeadcount) {
+      const proceed = await notify.confirm({
+        title: 'استبدال إجمالي العدد',
+        body: 'سيتم استبدال إجمالي العدد بقائمة أسماء الحاضرين. هل تريد المتابعة؟',
+        confirmText: 'استبدال',
+      });
+      if (!proceed) return;
     }
     if (next === 'headcount') setNames([]);
     if (next === 'names') setHeadcount('');
@@ -65,7 +76,7 @@ function ExecutionForm({ training }: ExecutionFormProps) {
     const name = nameDraft.trim();
     if (!name) return;
     if (names.length >= MAX_ATTENDEE_NAMES) {
-      window.alert(`لا يمكن إضافة أكثر من ${MAX_ATTENDEE_NAMES} اسماً. يمكن تسجيل إجمالي العدد بدل الأسماء.`);
+      void notify.info(`لا يمكن إضافة أكثر من ${MAX_ATTENDEE_NAMES} اسماً. يمكن تسجيل إجمالي العدد بدل الأسماء.`);
       return;
     }
     setNames((prev) => [...prev, name]);

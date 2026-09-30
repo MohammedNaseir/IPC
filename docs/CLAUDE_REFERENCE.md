@@ -142,6 +142,23 @@ Two more conventions from that feature:
   destination is announced as a navigation and supports middle-click and open-in-new-tab; the row stays
   clickable and keyboard-activatable to the same address.
 
+### Notifications and confirmations (the convention, feature 004)
+
+Every notification and confirmation goes through **`src/lib/notify.ts`** (`notify.info`, `notify.error`,
+`notify.confirm`), which wraps SweetAlert2 behind one module. Do **not** call `window.alert`,
+`window.confirm`, or a dialog library directly from a component — there are none left in
+`src/components/`, and re-adding one brings back the host-locale, LTR, unstyled native dialog this
+feature removed.
+
+- `notify.ts` dynamically imports SweetAlert2 rather than importing it at module scope, so the library
+  is not in the initial bundle for a page that never opens a dialog.
+- Every dialog renders RTL, in the product's own typography and palette (`.ipc-swal-*` overrides in
+  `src/app/globals.css`), never the library's default appearance.
+- `notify.confirm` is for a destructive or state-changing action a user must explicitly approve; it is
+  not a substitute for inline validation feedback, which stays in the form.
+- A browser back/forward navigation while a dialog is open is handled by `withPopstateGuard`, closing
+  the orphaned popup rather than leaving it stranded over a different page.
+
 ## 8. Known gaps (not implemented)
 
 - FR-35 **email** delivery (in-app notifications only; no mail provider in the spec).
@@ -156,6 +173,51 @@ Two more conventions from that feature:
 
 Deviations are recorded here, not by editing the SRS. Each entry names what is superseded, by
 what, and whether the SRS document itself still needs a manual update.
+
+### D-002 — The Programs screen is named "البرامج والاستراتيجيات" (2026-09-30)
+
+- **Superseded**: the SRS §3.9 section heading **"البرامج (Programs)"**, which names the screen and
+  module. FR-31 through FR-34 in that section describe capability only (creating a root programme,
+  creating multi-level subfolders, uploading files at any level, cluster-wide read/download
+  visibility for the `hospital` role) and are unaffected — no capability changes.
+- **Superseded by**: `specs/004-portal-ui-overhaul/spec.md`, item 2 / User Story 2, FR-015.
+- **Reason**: owner decision, recorded 2026-09-29 in the feature brief for `004-portal-ui-overhaul`.
+  No further rationale was given beyond the rename itself.
+- **New rule**: the screen's name is "البرامج والاستراتيجيات" everywhere it appears in the interface
+  — the screen title, the breadcrumb, and the sidebar entry (`src/components/shell/Sidebar.tsx`,
+  `src/components/views/ProgramsView.tsx`). The route (`/programs`) and every underlying capability
+  are unchanged.
+- **Status**: recorded exception, **not** a spec amendment. The SRS document has **not** been
+  edited; §3.9 still reads "البرامج (Programs)" and needs a manual update by the product owner.
+  Until that happens, this entry governs the interface.
+- **Also in this feature**: the same brief changed how an internal training is created — see
+  D-003 below.
+
+### D-003 — An internal training is created pending, not completed (2026-09-30)
+
+- **Superseded**: the shipped behaviour of `createInternalTraining` (`src/server/actions/trainings.ts`),
+  which wrote a new internal training as `status: 'completed'` with one attendance row carrying a
+  trainee count supplied at creation time. This was implementation behaviour, not an SRS requirement
+  — the SRS does not specify a status for a newly created internal training.
+- **Superseded by**: `specs/004-portal-ui-overhaul/spec.md`, item 1 / User Story 3, FR-039–FR-044,
+  Decision D1.
+- **Reason**: the trainee-count field asked for a number before the session's attendance was known.
+  Removing it left a training created `completed` with zero attendance — a record badged
+  "officially documented" that documented nothing. Creating it `pending` instead defers attendance
+  to the existing execution form on the training record page, matching how central-template
+  trainings already work.
+- **New rule**: `createInternalTraining` writes `status: 'pending'` and no attendance row. The
+  coordinator documents attendance afterward by names or by a single total, through the unchanged
+  execution form.
+- **Verified consequence, not merely asserted**: an internal training can never derive `late` and
+  can never raise an overdue reminder. `dueDate` lives on `TrainingTemplate`, not on `Training`;
+  `deriveTrainingStatus` (`src/server/queries/trainings.ts`) reads `template?.dueDate ?? null`; and
+  the reminder query in `src/app/api/cron/notifications/route.ts` filters on
+  `template: { dueDate: { lt: now } }`, an inner join a template-less training cannot satisfy. A
+  pending internal training therefore appears in the dashboard's pending count with no deadline and
+  nothing chasing it — accepted as the lesser problem, and out of scope to fix here.
+- **Status**: recorded exception, not an SRS conflict — the SRS is silent on this point, so there is
+  nothing in it to amend.
 
 ### D-001 — Training attendance is not linked to Practitioner (2026-09-27)
 

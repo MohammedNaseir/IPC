@@ -16,7 +16,8 @@ export function RecordSkeleton({ panels = 3, gallery = true }: RecordSkeletonPro
 
       <div className="h-8 w-48 rounded-lg bg-slate-100 animate-pulse" />
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-6">
+      {/* Matches the printed-register chrome (item 7, T3): flat, bordered, no shadow. */}
+      <div className="bg-white rounded-lg border border-slate-300 p-6 space-y-6">
         <div className="flex items-start justify-between gap-4 pb-5 border-b border-slate-200">
           <div className="space-y-2 flex-1">
             <div className="h-4 w-40 rounded-full bg-slate-100 animate-pulse" />

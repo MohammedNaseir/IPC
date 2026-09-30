@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Upload, Download, Filter, Network, FileArchive, X } from 'lucide-react';
+import { notify } from '@/lib/notify';
 import type {
   DocumentCenterFileDTO,
   OrgDocType,
@@ -200,7 +201,7 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      window.alert('يرجى اختيار ملف لرفعه.');
+      void notify.info('يرجى اختيار ملف لرفعه.');
       return;
     }
     const formData = new FormData();
