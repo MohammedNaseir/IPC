@@ -1,10 +1,12 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { FolderPlus, Folder, FileText, Upload, Download, ChevronRight, ArrowLeft, X } from 'lucide-react';
-import type { ProgramFileDTO, ProgramNodeDTO, SessionUser } from '@/lib/types';
+import { FolderPlus, Folder, FileText, Upload, Download, ChevronRight, ArrowLeft, X, Trash2, ArchiveRestore } from 'lucide-react';
+import type { ProgramFileDTO, ProgramNodeDTO, SessionUser, TrashedProgramNodeDTO } from '@/lib/types';
+import type { ColumnDef, RowAction } from '@/lib/table';
+import { DataTable } from '@/components/table/DataTable';
 import { formatDate, formatFileSize } from '@/lib/format';
-import { createProgramNode, uploadProgramFile } from '@/server/actions/programs';
+import { createProgramNode, deleteProgramNode, restoreProgramNode, uploadProgramFile } from '@/server/actions/programs';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 import { notify } from '@/lib/notify';
 
@@ -12,6 +14,7 @@ interface ProgramsViewProps {
   user: SessionUser;
   nodes: ProgramNodeDTO[];
   files: ProgramFileDTO[];
+  trashedNodes: TrashedProgramNodeDTO[];
 }
 
 const FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.pptx,.csv';
@@ -19,13 +22,15 @@ const FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.pptx
 // Restored folder/card presentation (item 2 / feature 004): the shared table fit records, not a
 // folder tree, so this screen goes back to the design that predates it — commit `11feba4` — carried
 // forward onto the current palette rather than reintroducing that commit's teal (FR-013, FR-014).
-export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
+export function ProgramsView({ user, nodes, files, trashedNodes }: ProgramsViewProps) {
   const isCentral = user.role === 'central';
   const { run, isPending } = useActionRunner();
 
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
+  // Soft delete (005-soft-delete, US5): central-only toggle swapping the tree for its trash.
+  const [showTrash, setShowTrash] = useState(false);
 
   const [folderName, setFolderName] = useState('');
   const [folderDesc, setFolderDesc] = useState('');
@@ -84,6 +89,54 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
     run(() => uploadProgramFile(formData), () => setShowFileModal(false));
   };
 
+  // Soft delete (005-soft-delete, US5). Deleting a program or folder takes its whole subtree with
+  // it, so the confirmation states the counts plainly; deleting a file is a plain leaf deletion.
+  const handleDeleteNode = async (e: React.MouseEvent, node: ProgramNodeDTO, childFolderCount: number, childFileCount: number) => {
+    e.stopPropagation();
+    const hasChildren = childFolderCount > 0 || childFileCount > 0;
+    const confirmed = await notify.confirm({
+      title: node.kind === 'program' ? 'حذف البرنامج' : 'حذف المجلد',
+      body: hasChildren
+        ? `سيتم حذف "${node.name}" وكل محتوياته (${childFolderCount} مجلد فرعي، ${childFileCount} ملف). يمكن استعادة ذلك معاً لاحقاً من سجل المحذوفات.`
+        : `سيتم حذف "${node.name}". يمكن استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteProgramNode(node.id));
+  };
+
+  const handleDeleteFile = async (e: React.MouseEvent, file: ProgramFileDTO) => {
+    e.stopPropagation();
+    const confirmed = await notify.confirm({
+      title: 'حذف الملف',
+      body: `سيتم حذف الملف "${file.name}". يمكن استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteProgramNode(file.id));
+  };
+
+  const handleRestoreNode = (n: TrashedProgramNodeDTO) => run(() => restoreProgramNode(n.id));
+
+  const trashedNodeActions: RowAction<TrashedProgramNodeDTO>[] = [
+    { label: 'استعادة', icon: ArchiveRestore, onSelect: handleRestoreNode },
+  ];
+  const kindLabel: Record<TrashedProgramNodeDTO['kind'], string> = { program: 'برنامج', folder: 'مجلد', file: 'ملف' };
+  const trashedNodeColumns: ColumnDef<TrashedProgramNodeDTO>[] = [
+    { key: 'name', header: 'الاسم', value: (n) => n.name, render: (n) => <span className="font-bold text-slate-900">{n.name}</span> },
+    { key: 'kind', header: 'النوع', value: (n) => kindLabel[n.kind] },
+    {
+      key: 'contents',
+      header: 'المحتويات المرتبطة',
+      value: (n) => n.folderCount + n.fileCount,
+      render: (n) => (n.folderCount + n.fileCount > 0 ? <span>{n.folderCount} مجلد، {n.fileCount} ملف</span> : <span className="text-muted">—</span>),
+    },
+    { key: 'deletedByName', header: 'حذف بواسطة', value: (n) => n.deletedByName },
+    { key: 'deletedAt', header: 'تاريخ الحذف', type: 'date', value: (n) => n.deletedAt, render: (n) => <span className="whitespace-nowrap">{formatDate(n.deletedAt)}</span> },
+  ];
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
@@ -106,27 +159,55 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
 
         {isCentral && (
           <div className="flex items-center gap-2">
-            <button
-              onClick={openFolderModal}
-              className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
-            >
-              <FolderPlus className="w-4 h-4 text-navy-400" />
-              <span>{activeNodeId ? 'إنشاء مجلد فرعي' : 'إنشاء برنامج رئيسي'}</span>
-            </button>
+            {!showTrash && (
+              <>
+                <button
+                  onClick={openFolderModal}
+                  className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+                >
+                  <FolderPlus className="w-4 h-4 text-navy-400" />
+                  <span>{activeNodeId ? 'إنشاء مجلد فرعي' : 'إنشاء برنامج رئيسي'}</span>
+                </button>
 
-            {activeNodeId && (
-              <button
-                onClick={openFileModal}
-                className="flex items-center gap-2 px-3.5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
-              >
-                <Upload className="w-4 h-4" />
-                <span>رفع ملف هنا</span>
-              </button>
+                {activeNodeId && (
+                  <button
+                    onClick={openFileModal}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>رفع ملف هنا</span>
+                  </button>
+                )}
+              </>
             )}
+
+            <button
+              onClick={() => setShowTrash((v) => !v)}
+              aria-pressed={showTrash}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all border ${
+                showTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {showTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{showTrash ? 'عرض المستودع النشط' : 'عرض المحذوفات'}</span>
+            </button>
           </div>
         )}
       </div>
 
+      {showTrash ? (
+        <DataTable
+          rows={trashedNodes}
+          columns={trashedNodeColumns}
+          rowKey={(n) => n.id}
+          actions={trashedNodeActions}
+          searchPlaceholder="بحث بالاسم..."
+          emptyMessage="لا توجد سجلات محذوفة"
+          noMatchMessage="لا توجد سجلات مطابقة للبحث"
+          caption="سجل عناصر البرامج المحذوفة"
+        />
+      ) : (
+        <>
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs overflow-x-auto">
           <button
@@ -205,6 +286,18 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
                         <span>{childNodes.length} مجلد فرعي</span>
                         <span>{childFiles.length} ملف</span>
                       </div>
+
+                      {isCentral && (
+                        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-end">
+                          <button
+                            onClick={(e) => handleDeleteNode(e, node, childNodes.length, childFiles.length)}
+                            className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-danger-700 hover:bg-danger-50 rounded"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>حذف</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -236,7 +329,7 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                       <a
                         href={item.file.url}
                         target="_blank"
@@ -246,6 +339,15 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
                         <Download className="w-3.5 h-3.5" />
                         <span>تحميل</span>
                       </a>
+                      {isCentral && (
+                        <button
+                          onClick={(e) => handleDeleteFile(e, item)}
+                          className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold text-danger-700 hover:bg-danger-50 rounded"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>حذف</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -253,6 +355,8 @@ export function ProgramsView({ user, nodes, files }: ProgramsViewProps) {
             </div>
           )}
         </div>
+      )}
+        </>
       )}
 
       {isCentral && showFolderModal && (

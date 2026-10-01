@@ -1,8 +1,9 @@
 import 'server-only';
-import { prisma } from '@/server/db';
-import type { AuditLogDTO, SessionUser, VisitDTO, VisitStatus } from '@/lib/types';
+import { prisma, prismaUnfiltered } from '@/server/db';
+import type { AuditLogDTO, SessionUser, VisitDTO, VisitStatus, TrashedVisitDTO } from '@/lib/types';
 import { hospitalScope } from '@/server/auth/scope';
 import { fileRefSelect, iso, toFileRef } from '@/server/queries/mappers';
+import { attachTrashMeta } from '@/server/queries/trash';
 
 // One include shape and one mapper, shared by the list query and the single-record fetch. Two copies of
 // this mapping would drift, and a record that reads differently on its own page than it does in the list
@@ -120,6 +121,28 @@ export async function visitExistsForUser(user: SessionUser, visitId: string): Pr
     select: { id: true },
   });
   return row !== null;
+}
+
+// Trash listing (005-soft-delete, US3). Central-only by convention. A simpler shape than VisitDTO
+// -- the trash view is a list to restore from, not a full record view, so it doesn't need
+// attachments/responses.
+export async function listTrashedVisits(): Promise<TrashedVisitDTO[]> {
+  const rows = await prismaUnfiltered.visit.findMany({
+    where: { deletedAt: { not: null } },
+    orderBy: { deletedAt: 'desc' },
+    include: { hospital: { select: { name: true } } },
+  });
+  return attachTrashMeta(
+    'Visit',
+    rows.map((v) => ({
+      id: v.id,
+      hospitalId: v.hospitalId,
+      hospitalName: v.hospital.name,
+      visitDate: iso(v.visitDate),
+      team: v.team,
+      deletedAt: v.deletedAt,
+    })),
+  );
 }
 
 // Only returns logs for visits inside the caller's scope.

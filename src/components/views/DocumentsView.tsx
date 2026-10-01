@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Upload, Download, Filter, Network, FileArchive, X } from 'lucide-react';
+import { Upload, Download, Filter, Network, FileArchive, X, Trash2, ArchiveRestore } from 'lucide-react';
 import { notify } from '@/lib/notify';
 import type {
   DocumentCenterFileDTO,
@@ -10,13 +10,14 @@ import type {
   PolicyCategory,
   PolicyDTO,
   SessionUser,
+  TrashedRecordMeta,
 } from '@/lib/types';
-import type { ColumnDef } from '@/lib/table';
+import type { ColumnDef, RowAction } from '@/lib/table';
 import { DataTable } from '@/components/table/DataTable';
 import { formatDate, formatFileSize } from '@/lib/format';
-import { createPolicy } from '@/server/actions/policies';
-import { createOrgDocument } from '@/server/actions/org-documents';
-import { createDocumentCenterFile } from '@/server/actions/document-center';
+import { createPolicy, deletePolicy, restorePolicy } from '@/server/actions/policies';
+import { createOrgDocument, deleteOrgDocument, restoreOrgDocument } from '@/server/actions/org-documents';
+import { createDocumentCenterFile, deleteDocumentCenterFile, restoreDocumentCenterFile } from '@/server/actions/document-center';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 
 type ModuleType = 'policies' | 'orgDocs' | 'docCenter';
@@ -27,6 +28,11 @@ interface DocumentsViewProps {
   policies?: PolicyDTO[];
   orgDocs?: OrgDocumentDTO[];
   docCenterItems?: DocumentCenterFileDTO[];
+  // Soft delete (005-soft-delete, US2). Always empty for a non-central user -- trash is
+  // central-only (spec FR-005); the page only fetches these for a central user.
+  trashedPolicies?: (PolicyDTO & TrashedRecordMeta)[];
+  trashedOrgDocs?: (OrgDocumentDTO & TrashedRecordMeta)[];
+  trashedDocCenterItems?: (DocumentCenterFileDTO & TrashedRecordMeta)[];
 }
 
 const FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.pptx,.csv';
@@ -63,11 +69,23 @@ const META = {
   },
 } as const;
 
-export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], docCenterItems = [] }: DocumentsViewProps) {
+export function DocumentsView({
+  user,
+  moduleType,
+  policies = [],
+  orgDocs = [],
+  docCenterItems = [],
+  trashedPolicies = [],
+  trashedOrgDocs = [],
+  trashedDocCenterItems = [],
+}: DocumentsViewProps) {
   const isCentral = user.role === 'central';
   const { run, isPending } = useActionRunner();
   const [selectedCategory, setSelectedCategory] = useState<'all' | PolicyCategory>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  // Soft delete (005-soft-delete, US2): a central-only toggle swapping the active DataTable for
+  // its trash -- there is only one table per moduleType here, not a tab bar like AssetsView.
+  const [showTrash, setShowTrash] = useState(false);
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<PolicyCategory>('policy');
@@ -222,6 +240,83 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
     run(action, () => setShowUploadModal(false));
   };
 
+  // Soft delete (005-soft-delete, US2). Central-only, matching this screen's upload gating.
+  const handleDeletePolicy = async (p: PolicyDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف الوثيقة',
+      body: `سيتم حذف "${p.title}" من مكتبة السياسات. يمكن استعادتها لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deletePolicy(p.id));
+  };
+  const handleDeleteOrgDoc = async (o: OrgDocumentDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف الوثيقة التنظيمية',
+      body: `سيتم حذف "${o.title}". يمكن استعادتها لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteOrgDocument(o.id));
+  };
+  const handleDeleteDocCenter = async (d: DocumentCenterFileDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف الملف',
+      body: `سيتم حذف "${d.title}" من مركز الوثائق العام. يمكن استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteDocumentCenterFile(d.id));
+  };
+
+  const handleRestorePolicy = (p: PolicyDTO) => run(() => restorePolicy(p.id));
+  const handleRestoreOrgDoc = (o: OrgDocumentDTO) => run(() => restoreOrgDocument(o.id));
+  const handleRestoreDocCenter = (d: DocumentCenterFileDTO) => run(() => restoreDocumentCenterFile(d.id));
+
+  const policyActions: RowAction<PolicyDTO>[] = isCentral ? [{ label: 'حذف الوثيقة', icon: Trash2, onSelect: handleDeletePolicy }] : [];
+  const orgDocActions: RowAction<OrgDocumentDTO>[] = isCentral ? [{ label: 'حذف الوثيقة', icon: Trash2, onSelect: handleDeleteOrgDoc }] : [];
+  const docCenterActions: RowAction<DocumentCenterFileDTO>[] = isCentral
+    ? [{ label: 'حذف الملف', icon: Trash2, onSelect: handleDeleteDocCenter }]
+    : [];
+
+  const trashedPolicyActions: RowAction<PolicyDTO & TrashedRecordMeta>[] = [
+    { label: 'استعادة الوثيقة', icon: ArchiveRestore, onSelect: handleRestorePolicy },
+  ];
+  const trashedOrgDocActions: RowAction<OrgDocumentDTO & TrashedRecordMeta>[] = [
+    { label: 'استعادة الوثيقة', icon: ArchiveRestore, onSelect: handleRestoreOrgDoc },
+  ];
+  const trashedDocCenterActions: RowAction<DocumentCenterFileDTO & TrashedRecordMeta>[] = [
+    { label: 'استعادة الملف', icon: ArchiveRestore, onSelect: handleRestoreDocCenter },
+  ];
+
+  // Trash tables reuse each module's own columns plus who/when it was removed (research.md R-003).
+  const trashMetaColumns = <T,>(): ColumnDef<T & TrashedRecordMeta>[] => [
+    {
+      key: 'deletedByName',
+      header: 'حذف بواسطة',
+      value: (r) => r.deletedByName,
+      render: (r) => <span className="text-navy-700 font-medium">{r.deletedByName}</span>,
+    },
+    {
+      key: 'deletedAt',
+      header: 'تاريخ الحذف',
+      type: 'date',
+      value: (r) => r.deletedAt,
+      render: (r) => <span className="whitespace-nowrap">{formatDate(r.deletedAt)}</span>,
+    },
+  ];
+  // The download link still works in the trash view -- the underlying file isn't touched by this
+  // feature, and seeing the content helps confirm this is the right record before restoring it.
+  const trashedPolicyColumns: ColumnDef<PolicyDTO & TrashedRecordMeta>[] = [...policyColumns, ...trashMetaColumns<PolicyDTO>()];
+  const trashedOrgDocColumns: ColumnDef<OrgDocumentDTO & TrashedRecordMeta>[] = [...orgDocColumns, ...trashMetaColumns<OrgDocumentDTO>()];
+  const trashedDocCenterColumns: ColumnDef<DocumentCenterFileDTO & TrashedRecordMeta>[] = [
+    ...docCenterColumns,
+    ...trashMetaColumns<DocumentCenterFileDTO>(),
+  ];
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
@@ -241,13 +336,25 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
         </div>
 
         {isCentral && (
-          <button
-            onClick={openUploadModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
-          >
-            <Upload className="w-4 h-4" />
-            <span>{meta.btnText}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTrash((v) => !v)}
+              aria-pressed={showTrash}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                showTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {showTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{showTrash ? 'عرض السجل النشط' : 'عرض المحذوفات'}</span>
+            </button>
+            <button
+              onClick={openUploadModal}
+              className="flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+            >
+              <Upload className="w-4 h-4" />
+              <span>{meta.btnText}</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -271,41 +378,80 @@ export function DocumentsView({ user, moduleType, policies = [], orgDocs = [], d
         </div>
       )}
 
-      {moduleType === 'policies' && (
-        <DataTable
-          rows={scopedPolicies}
-          columns={policyColumns}
-          rowKey={(p) => p.id}
-          searchPlaceholder="بحث في عناوين السياسات والتصنيفات..."
-          emptyMessage="لا توجد سياسات مرفوعة بعد"
-          noMatchMessage="لا توجد سياسات مطابقة للبحث"
-          caption="مكتبة السياسات والإجراءات والنماذج"
-        />
-      )}
+      {moduleType === 'policies' &&
+        (showTrash ? (
+          <DataTable
+            rows={trashedPolicies}
+            columns={trashedPolicyColumns}
+            rowKey={(p) => p.id}
+            actions={trashedPolicyActions}
+            searchPlaceholder="بحث في عناوين السياسات..."
+            emptyMessage="لا توجد سجلات محذوفة"
+            noMatchMessage="لا توجد سجلات مطابقة للبحث"
+            caption="سجل السياسات المحذوفة"
+          />
+        ) : (
+          <DataTable
+            rows={scopedPolicies}
+            columns={policyColumns}
+            rowKey={(p) => p.id}
+            actions={policyActions}
+            searchPlaceholder="بحث في عناوين السياسات والتصنيفات..."
+            emptyMessage="لا توجد سياسات مرفوعة بعد"
+            noMatchMessage="لا توجد سياسات مطابقة للبحث"
+            caption="مكتبة السياسات والإجراءات والنماذج"
+          />
+        ))}
 
-      {moduleType === 'orgDocs' && (
-        <DataTable
-          rows={orgDocs}
-          columns={orgDocColumns}
-          rowKey={(o) => o.id}
-          searchPlaceholder="بحث في عناوين الوثائق التنظيمية..."
-          emptyMessage="لا توجد وثائق تنظيمية مرفوعة بعد"
-          noMatchMessage="لا توجد وثائق تنظيمية مطابقة"
-          caption="الهيكل التنظيمي والوصف الوظيفي"
-        />
-      )}
+      {moduleType === 'orgDocs' &&
+        (showTrash ? (
+          <DataTable
+            rows={trashedOrgDocs}
+            columns={trashedOrgDocColumns}
+            rowKey={(o) => o.id}
+            actions={trashedOrgDocActions}
+            searchPlaceholder="بحث في عناوين الوثائق..."
+            emptyMessage="لا توجد سجلات محذوفة"
+            noMatchMessage="لا توجد سجلات مطابقة للبحث"
+            caption="سجل الوثائق التنظيمية المحذوفة"
+          />
+        ) : (
+          <DataTable
+            rows={orgDocs}
+            columns={orgDocColumns}
+            rowKey={(o) => o.id}
+            actions={orgDocActions}
+            searchPlaceholder="بحث في عناوين الوثائق التنظيمية..."
+            emptyMessage="لا توجد وثائق تنظيمية مرفوعة بعد"
+            noMatchMessage="لا توجد وثائق تنظيمية مطابقة"
+            caption="الهيكل التنظيمي والوصف الوظيفي"
+          />
+        ))}
 
-      {moduleType === 'docCenter' && (
-        <DataTable
-          rows={docCenterItems}
-          columns={docCenterColumns}
-          rowKey={(d) => d.id}
-          searchPlaceholder="بحث في عناوين ملفات المستودع..."
-          emptyMessage="لا توجد ملفات في المستودع العام"
-          noMatchMessage="لا توجد ملفات مطابقة للبحث"
-          caption="مركز الوثائق العام"
-        />
-      )}
+      {moduleType === 'docCenter' &&
+        (showTrash ? (
+          <DataTable
+            rows={trashedDocCenterItems}
+            columns={trashedDocCenterColumns}
+            rowKey={(d) => d.id}
+            actions={trashedDocCenterActions}
+            searchPlaceholder="بحث في عناوين الملفات..."
+            emptyMessage="لا توجد سجلات محذوفة"
+            noMatchMessage="لا توجد سجلات مطابقة للبحث"
+            caption="سجل مركز الوثائق المحذوفة"
+          />
+        ) : (
+          <DataTable
+            rows={docCenterItems}
+            columns={docCenterColumns}
+            rowKey={(d) => d.id}
+            actions={docCenterActions}
+            searchPlaceholder="بحث في عناوين ملفات المستودع..."
+            emptyMessage="لا توجد ملفات في المستودع العام"
+            noMatchMessage="لا توجد ملفات مطابقة للبحث"
+            caption="مركز الوثائق العام"
+          />
+        ))}
 
       {isCentral && showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in" dir="rtl">

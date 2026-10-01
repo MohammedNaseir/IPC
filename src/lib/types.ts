@@ -2,6 +2,15 @@
 
 export type UserRole = 'central' | 'hospital';
 
+// Soft delete (005-soft-delete). Mixed into a record's own DTO for its Trash-view variant, e.g.
+// `PractitionerDTO & TrashedRecordMeta`. deletedByName/deletedAt come from the most recent matching
+// AuditLog entry, not a stored column -- AuditLog stays the single source for "who did this, when"
+// (contracts/soft-delete.md, research.md R-003).
+export interface TrashedRecordMeta {
+  deletedAt: string;
+  deletedByName: string;
+}
+
 export interface SessionUser {
   id: string;
   email: string;
@@ -17,6 +26,16 @@ export interface CoordinatorDTO {
   email: string;
 }
 
+// Soft delete (005-soft-delete, US6). hospitalName is null once a replacement coordinator has
+// taken the hospital slot (research.md R-005's accepted consequence: the restored account would
+// come back orphaned, hospitalId cleared).
+export interface TrashedCoordinatorDTO extends TrashedRecordMeta {
+  id: string;
+  name: string;
+  email: string;
+  hospitalName: string | null;
+}
+
 export interface HospitalDTO {
   id: string;
   name: string;
@@ -25,6 +44,14 @@ export interface HospitalDTO {
   isActive: boolean;
   createdAt: string;
   coordinator: CoordinatorDTO | null;
+}
+
+// Soft delete (005-soft-delete, US4).
+export interface TrashedHospitalDTO extends TrashedRecordMeta {
+  id: string;
+  name: string;
+  location: string;
+  type: string;
 }
 
 export interface FileRefDTO {
@@ -66,6 +93,16 @@ export interface VisitDTO {
   responses: VisitResponseDTO[];
 }
 
+// Soft delete (005-soft-delete). A trash row is a simpler shape than the full DTO -- a list to
+// restore from, not a full record view.
+export interface TrashedVisitDTO extends TrashedRecordMeta {
+  id: string;
+  hospitalId: string;
+  hospitalName: string;
+  visitDate: string;
+  team: string;
+}
+
 export interface AuditLogDTO {
   id: string;
   entityType: string;
@@ -101,6 +138,31 @@ export interface TrainingDTO {
   attendeeNames: string[];
   attachments: TrainingAttachmentDTO[];
   createdAt: string;
+}
+
+// Soft delete (005-soft-delete). There was no existing screen listing TrainingTemplate master
+// records on their own (only the per-hospital Training copies distributed from one) -- this is new,
+// minimal surface needed so a central user has somewhere to delete/restore a template from.
+export interface TrainingTemplateDTO {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  trainingCount: number;
+  createdAt: string;
+}
+
+export interface TrashedTrainingTemplateDTO extends TrashedRecordMeta {
+  id: string;
+  title: string;
+}
+
+// Soft delete (005-soft-delete).
+export interface TrashedTrainingDTO extends TrashedRecordMeta {
+  id: string;
+  hospitalId: string;
+  hospitalName: string;
+  title: string;
 }
 
 export interface PractitionerDTO {
@@ -169,6 +231,17 @@ export interface ProgramFileDTO {
   name: string;
   file: FileRefDTO;
   uploadedAt: string;
+}
+
+// Soft delete (005-soft-delete, US5). One row per deletion *event* root -- the program, folder or
+// file the user actually clicked delete on -- not one row per cascaded descendant; `id` is what
+// gets passed back to `restoreProgramNode` to bring the whole branch back.
+export interface TrashedProgramNodeDTO extends TrashedRecordMeta {
+  id: string;
+  kind: 'program' | 'folder' | 'file';
+  name: string;
+  folderCount: number;
+  fileCount: number;
 }
 
 export type NotificationType = 'training_overdue' | 'visit_upcoming' | 'new_document';

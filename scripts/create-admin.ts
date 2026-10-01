@@ -50,7 +50,10 @@ async function main() {
 
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
   try {
-    const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    // findFirst, not findUnique: email is no longer a Prisma-level unique field (005-soft-delete
+    // research.md R-005). This script uses its own unextended PrismaClient (not the app's
+    // soft-delete-filtering singleton in src/server/db.ts), so deletedAt is checked explicitly.
+    const existing = await prisma.user.findFirst({ where: { email, deletedAt: null }, select: { id: true } });
     if (existing) {
       console.error('A user with this email already exists.');
       process.exit(1);

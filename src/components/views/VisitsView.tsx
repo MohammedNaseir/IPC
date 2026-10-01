@@ -3,26 +3,29 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, X } from 'lucide-react';
-import type { HospitalDTO, SessionUser, VisitDTO } from '@/lib/types';
-import type { ColumnDef } from '@/lib/table';
+import { Plus, X, Trash2, ArchiveRestore } from 'lucide-react';
+import type { HospitalDTO, SessionUser, VisitDTO, TrashedVisitDTO } from '@/lib/types';
+import type { ColumnDef, RowAction } from '@/lib/table';
 import { DataTable } from '@/components/table/DataTable';
 import { readListFilters, writeListFilters } from '@/components/table/listStateStore';
 import { formatDate, todayInputValue } from '@/lib/format';
-import { createVisit } from '@/server/actions/visits';
+import { notify } from '@/lib/notify';
+import { createVisit, deleteVisit, restoreVisit } from '@/server/actions/visits';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 
 interface VisitsViewProps {
   user: SessionUser;
   visits: VisitDTO[];
   hospitals: HospitalDTO[];
+  // Soft delete (005-soft-delete, US3). Always empty for a non-central user.
+  trashedVisits: TrashedVisitDTO[];
 }
 
 // One key for this screen's table and its filter selects, so the two halves of the list's place cannot
 // fall out of step when the user comes back from a record page.
 const LIST_KEY = 'visits';
 
-export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
+export function VisitsView({ user, visits, hospitals, trashedVisits }: VisitsViewProps) {
   const isCentral = user.role === 'central';
   const router = useRouter();
   const { run, isPending } = useActionRunner();
@@ -31,6 +34,8 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
   const [filterStatus, setFilterStatus] = useState<string>(() => readListFilters(LIST_KEY)?.status ?? 'all');
   const [filterHospital, setFilterHospital] = useState<string>(() => readListFilters(LIST_KEY)?.hospital ?? '');
   const [visibleCount, setVisibleCount] = useState<number | null>(null);
+  // Soft delete (005-soft-delete, US3): central-only toggle swapping the active table for its trash.
+  const [showTrash, setShowTrash] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newHospId, setNewHospId] = useState(hospitals[0]?.id ?? '');
@@ -148,6 +153,35 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
     [],
   );
 
+  // Soft delete (005-soft-delete, US3). No delete control at all for a completed visit (FR-008) --
+  // isAvailable, not a disabled button, so it is genuinely absent from the DOM.
+  const handleDelete = async (v: VisitDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف الزيارة الرقابية',
+      body: `سيتم حذف زيارة "${v.hospitalName}" بتاريخ ${formatDate(v.visitDate)}. يمكن استعادتها لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteVisit(v.id));
+  };
+  const handleRestore = (v: TrashedVisitDTO) => run(() => restoreVisit(v.id));
+
+  const visitActions: RowAction<VisitDTO>[] = [
+    { label: 'حذف الزيارة', icon: Trash2, onSelect: handleDelete, isAvailable: (v) => v.status !== 'completed' },
+  ];
+  const trashedVisitActions: RowAction<TrashedVisitDTO>[] = [
+    { label: 'استعادة الزيارة', icon: ArchiveRestore, onSelect: handleRestore },
+  ];
+
+  const trashedVisitColumns: ColumnDef<TrashedVisitDTO>[] = [
+    { key: 'hospitalName', header: 'المستشفى', value: (v) => v.hospitalName },
+    { key: 'visitDate', header: 'تاريخ الزيارة', type: 'date', value: (v) => v.visitDate, render: (v) => <span className="whitespace-nowrap">{formatDate(v.visitDate)}</span> },
+    { key: 'team', header: 'الفريق الزائر', value: (v) => v.team },
+    { key: 'deletedByName', header: 'حذف بواسطة', value: (v) => v.deletedByName },
+    { key: 'deletedAt', header: 'تاريخ الحذف', type: 'date', value: (v) => v.deletedAt, render: (v) => <span className="whitespace-nowrap">{formatDate(v.deletedAt)}</span> },
+  ];
+
   const handleTableState = useCallback(
     ({ filteredCount }: { filteredRows: VisitDTO[]; filteredCount: number }) => setVisibleCount(filteredCount),
     [],
@@ -202,14 +236,26 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
         </div>
 
         {isCentral && (
-          <button
-            onClick={openCreateModal}
-            disabled={hospitals.length === 0}
-            className="no-print flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50"
-          >
-            <Plus className="w-4 h-4" />
-            <span>إنشاء زيارة رقابية جديدة</span>
-          </button>
+          <div className="flex items-center gap-2 no-print">
+            <button
+              onClick={() => setShowTrash((v) => !v)}
+              aria-pressed={showTrash}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                showTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {showTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{showTrash ? 'عرض السجل النشط' : 'عرض المحذوفات'}</span>
+            </button>
+            <button
+              onClick={openCreateModal}
+              disabled={hospitals.length === 0}
+              className="flex items-center gap-2 px-4 py-2.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إنشاء زيارة رقابية جديدة</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -248,18 +294,32 @@ export function VisitsView({ user, visits, hospitals }: VisitsViewProps) {
         </div>
       </div>
 
-      <DataTable
-        rows={scopedVisits}
-        columns={visitColumns}
-        rowKey={(v) => v.id}
-        onRowSelect={(v) => router.push(`/visits/${v.id}`)}
-        onStateChange={handleTableState}
-        stateKey={LIST_KEY}
-        searchPlaceholder="بحث في الزيارات، المستشفيات، الفريق..."
-        emptyMessage="لا توجد زيارات رقابية مسجلة بعد"
-        noMatchMessage="لا توجد زيارات مطابقة للفلتر المحدد"
-        caption="سجل الزيارات الرقابية"
-      />
+      {showTrash ? (
+        <DataTable
+          rows={trashedVisits}
+          columns={trashedVisitColumns}
+          rowKey={(v) => v.id}
+          actions={trashedVisitActions}
+          searchPlaceholder="بحث في الزيارات المحذوفة..."
+          emptyMessage="لا توجد سجلات محذوفة"
+          noMatchMessage="لا توجد سجلات مطابقة للبحث"
+          caption="سجل الزيارات المحذوفة"
+        />
+      ) : (
+        <DataTable
+          rows={scopedVisits}
+          columns={visitColumns}
+          rowKey={(v) => v.id}
+          actions={visitActions}
+          onRowSelect={(v) => router.push(`/visits/${v.id}`)}
+          onStateChange={handleTableState}
+          stateKey={LIST_KEY}
+          searchPlaceholder="بحث في الزيارات، المستشفيات، الفريق..."
+          emptyMessage="لا توجد زيارات رقابية مسجلة بعد"
+          noMatchMessage="لا توجد زيارات مطابقة للفلتر المحدد"
+          caption="سجل الزيارات الرقابية"
+        />
+      )}
 
       {/* Create Visit Modal (Central only) */}
       {isCentral && showCreateModal && (

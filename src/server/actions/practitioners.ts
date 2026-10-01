@@ -1,8 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import { prisma } from '@/server/db';
-import { requireActionUser } from '@/server/auth/session';
+import { prisma, prismaUnfiltered } from '@/server/db';
+import { requireActionCentral, requireActionUser } from '@/server/auth/session';
 import { assertHospitalAccess, hospitalScope } from '@/server/auth/scope';
 import { logAudit } from '@/server/audit';
 import { runAction } from '@/server/run-action';
@@ -51,6 +51,41 @@ export async function updatePractitioner(practitionerId: string, input: z.input<
       }
       await tx.practitioner.update({ where: { id }, data });
       await logAudit(tx, actor, 'Practitioner', id, `تعديل بيانات ممارس صحي: ${data.name}`);
+    });
+
+    return null;
+  });
+}
+
+// Soft delete (005-soft-delete, US1). Permission mirrors updatePractitioner exactly: the owning
+// hospital's coordinator or central.
+export async function deletePractitioner(practitionerId: string) {
+  return runAction(async () => {
+    const actor = await requireActionUser();
+    const id = idSchema.parse(practitionerId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.practitioner.findFirst({ where: { id, ...hospitalScope(actor) } });
+      if (!existing) throw new NotFoundError();
+      await tx.practitioner.update({ where: { id }, data: { deletedAt: new Date() } });
+      await logAudit(tx, actor, 'Practitioner', id, `حذف ممارس صحي: ${existing.name}`);
+    });
+
+    return null;
+  });
+}
+
+// Restore is always central-only, even though delete is not (contracts/soft-delete.md).
+export async function restorePractitioner(practitionerId: string) {
+  return runAction(async () => {
+    const actor = await requireActionCentral();
+    const id = idSchema.parse(practitionerId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await prismaUnfiltered.practitioner.findUnique({ where: { id } });
+      if (!existing || existing.deletedAt === null) throw new NotFoundError();
+      await tx.practitioner.update({ where: { id }, data: { deletedAt: null, deletionEventId: null } });
+      await logAudit(tx, actor, 'Practitioner', id, `استعادة ممارس صحي: ${existing.name}`);
     });
 
     return null;

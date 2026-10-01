@@ -1,5 +1,6 @@
 import 'server-only';
-import type { NotificationType, Prisma } from '@/generated/prisma/client';
+import type { NotificationType } from '@/generated/prisma/client';
+import type { ExtendedTransactionClient } from '@/server/db';
 
 interface NotificationPayload {
   type: NotificationType;
@@ -9,7 +10,7 @@ interface NotificationPayload {
 }
 
 export async function notifyUsers(
-  tx: Prisma.TransactionClient,
+  tx: ExtendedTransactionClient,
   userIds: string[],
   payload: NotificationPayload,
 ): Promise<void> {
@@ -20,7 +21,7 @@ export async function notifyUsers(
 }
 
 export async function notifyHospitalCoordinator(
-  tx: Prisma.TransactionClient,
+  tx: ExtendedTransactionClient,
   hospitalId: string,
   payload: NotificationPayload,
 ): Promise<void> {
@@ -30,7 +31,7 @@ export async function notifyHospitalCoordinator(
 
 // Central users plus coordinators of active hospitals, optionally excluding the actor.
 export async function notifyAllActiveUsers(
-  tx: Prisma.TransactionClient,
+  tx: ExtendedTransactionClient,
   payload: NotificationPayload,
   excludeUserId?: string,
 ): Promise<void> {

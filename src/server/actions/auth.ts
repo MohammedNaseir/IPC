@@ -24,7 +24,9 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: INVALID_CREDENTIALS };
   }
 
-  const user = await prisma.user.findUnique({
+  // findFirst, not findUnique: email is no longer a Prisma-level unique field (005-soft-delete
+  // research.md R-005) -- uniqueness among active accounts is enforced by a partial index instead.
+  const user = await prisma.user.findFirst({
     where: { email },
     select: {
       id: true,

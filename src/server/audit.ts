@@ -1,20 +1,22 @@
 import 'server-only';
-import type { Prisma } from '@/generated/prisma/client';
 import type { SessionUser } from '@/lib/types';
+import type { ExtendedTransactionClient } from '@/server/db';
 
 export type AuditEntity =
   | 'User'
   | 'Hospital'
   | 'Visit'
   | 'Training'
+  | 'TrainingTemplate'
   | 'Practitioner'
   | 'Equipment'
   | 'Policy'
   | 'Document'
-  | 'Program';
+  | 'Program'
+  | 'ProgramFolder';
 
 export async function logAudit(
-  tx: Prisma.TransactionClient,
+  tx: ExtendedTransactionClient,
   actor: Pick<SessionUser, 'id' | 'name'>,
   entityType: AuditEntity,
   entityId: string,

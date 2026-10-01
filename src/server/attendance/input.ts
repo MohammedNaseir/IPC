@@ -1,5 +1,5 @@
 import 'server-only';
-import type { Prisma } from '@/generated/prisma/client';
+import type { ExtendedTransactionClient } from '@/server/db';
 import { ValidationError } from '@/server/errors';
 import {
   ATTENDEE_NAME_MAX_LENGTH,
@@ -76,7 +76,7 @@ export function parseAttendanceInput(formData: FormData): AttendanceInput {
 // rows. The lock serialises attendance writes per training so the later save replaces rather than
 // merges.
 export async function replaceAttendance(
-  tx: Prisma.TransactionClient,
+  tx: ExtendedTransactionClient,
   trainingId: string,
   input: AttendanceInput,
 ): Promise<number> {

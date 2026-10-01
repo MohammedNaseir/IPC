@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Users2, Wrench, Plus, Edit2, X } from 'lucide-react';
-import type { EquipmentDTO, HospitalDTO, PractitionerDTO, SessionUser } from '@/lib/types';
+import { Users2, Wrench, Plus, Edit2, X, Trash2, ArchiveRestore } from 'lucide-react';
+import type { EquipmentDTO, HospitalDTO, PractitionerDTO, SessionUser, TrashedRecordMeta } from '@/lib/types';
 import type { ColumnDef, RowAction } from '@/lib/table';
 import { DataTable } from '@/components/table/DataTable';
 import { formatDate, todayInputValue } from '@/lib/format';
-import { createPractitioner, updatePractitioner } from '@/server/actions/practitioners';
-import { createEquipment, updateEquipment } from '@/server/actions/equipment';
+import { notify } from '@/lib/notify';
+import { createPractitioner, deletePractitioner, restorePractitioner, updatePractitioner } from '@/server/actions/practitioners';
+import { createEquipment, deleteEquipment, restoreEquipment, updateEquipment } from '@/server/actions/equipment';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 
 interface AssetsViewProps {
@@ -15,17 +16,31 @@ interface AssetsViewProps {
   practitioners: PractitionerDTO[];
   equipments: EquipmentDTO[];
   hospitals: HospitalDTO[];
+  // Soft delete (005-soft-delete, US1). Always empty for a non-central user -- the trash is
+  // central-only (spec FR-005); the page only fetches these when the signed-in user is central.
+  trashedPractitioners: (PractitionerDTO & TrashedRecordMeta)[];
+  trashedEquipments: (EquipmentDTO & TrashedRecordMeta)[];
 }
 
 const EQUIPMENT_STATUSES = ['يعمل بكفاءة', 'بحاجة لصيانة', 'خارج الخدمة مؤقتاً'];
 
-export function AssetsView({ user, practitioners, equipments, hospitals }: AssetsViewProps) {
+export function AssetsView({
+  user,
+  practitioners,
+  equipments,
+  hospitals,
+  trashedPractitioners,
+  trashedEquipments,
+}: AssetsViewProps) {
   const isCentral = user.role === 'central';
   const defaultHospitalId = user.hospitalId ?? hospitals[0]?.id ?? '';
   const { run, isPending } = useActionRunner();
 
   const [activeTab, setActiveTab] = useState<'practitioners' | 'equipments'>('practitioners');
   const [filterHospital, setFilterHospital] = useState('');
+  // Soft delete (005-soft-delete, US1): a central-only toggle that swaps each tab's table for its
+  // trash. Orthogonal to activeTab, which still decides practitioners vs. equipment.
+  const [showTrash, setShowTrash] = useState(false);
 
   const [showAddPracModal, setShowAddPracModal] = useState(false);
   const [editingPrac, setEditingPrac] = useState<PractitionerDTO | null>(null);
@@ -143,6 +158,32 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
     [],
   );
 
+  // Soft delete (005-soft-delete, US1): the trash tables reuse each module's own columns plus
+  // who/when it was removed (research.md R-003).
+  const trashMetaColumns = <T,>(): ColumnDef<T & TrashedRecordMeta>[] => [
+    {
+      key: 'deletedByName',
+      header: 'حذف بواسطة',
+      value: (r) => r.deletedByName,
+      render: (r) => <span className="text-navy-700 font-medium">{r.deletedByName}</span>,
+    },
+    {
+      key: 'deletedAt',
+      header: 'تاريخ الحذف',
+      type: 'date',
+      value: (r) => r.deletedAt,
+      render: (r) => <span className="whitespace-nowrap">{formatDate(r.deletedAt)}</span>,
+    },
+  ];
+  const trashedPractitionerColumns = useMemo<ColumnDef<PractitionerDTO & TrashedRecordMeta>[]>(
+    () => [...practitionerColumns, ...trashMetaColumns<PractitionerDTO>()],
+    [practitionerColumns],
+  );
+  const trashedEquipmentColumns = useMemo<ColumnDef<EquipmentDTO & TrashedRecordMeta>[]>(
+    () => [...equipmentColumns, ...trashMetaColumns<EquipmentDTO>()],
+    [equipmentColumns],
+  );
+
   const closePracModal = () => {
     setShowAddPracModal(false);
     setEditingPrac(null);
@@ -221,11 +262,51 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
     run(() => (target ? updateEquipment(target.id, payload) : createEquipment(payload)), closeEqModal);
   };
 
+  // Soft delete (005-soft-delete, US1). One notify.confirm naming the record, matching the
+  // project's established confirmation convention.
+  const handleDeletePrac = async (p: PractitionerDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف الممارس الصحي',
+      body: `سيتم حذف "${p.name}" من سجل الكادر. يمكن لمسؤول الإدارة المركزية استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deletePractitioner(p.id));
+  };
+
+  const handleRestorePrac = (p: PractitionerDTO) => {
+    run(() => restorePractitioner(p.id));
+  };
+
+  const handleDeleteEq = async (eq: EquipmentDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف الجهاز',
+      body: `سيتم حذف "${eq.name}" من سجل الأجهزة. يمكن لمسؤول الإدارة المركزية استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteEquipment(eq.id));
+  };
+
+  const handleRestoreEq = (eq: EquipmentDTO) => {
+    run(() => restoreEquipment(eq.id));
+  };
+
   const practitionerActions: RowAction<PractitionerDTO>[] = [
     { label: 'تعديل بيانات الممارس', icon: Edit2, onSelect: handleOpenEditPrac },
+    { label: 'حذف الممارس', icon: Trash2, onSelect: handleDeletePrac },
   ];
   const equipmentActions: RowAction<EquipmentDTO>[] = [
     { label: 'تعديل بيانات الجهاز', icon: Edit2, onSelect: handleOpenEditEq },
+    { label: 'حذف الجهاز', icon: Trash2, onSelect: handleDeleteEq },
+  ];
+  const trashedPractitionerActions: RowAction<PractitionerDTO & TrashedRecordMeta>[] = [
+    { label: 'استعادة الممارس', icon: ArchiveRestore, onSelect: handleRestorePrac },
+  ];
+  const trashedEquipmentActions: RowAction<EquipmentDTO & TrashedRecordMeta>[] = [
+    { label: 'استعادة الجهاز', icon: ArchiveRestore, onSelect: handleRestoreEq },
   ];
 
   return (
@@ -296,6 +377,18 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
 
         <div className="flex items-center gap-3">
           {isCentral && (
+            <button
+              onClick={() => setShowTrash((v) => !v)}
+              aria-pressed={showTrash}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                showTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {showTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{showTrash ? 'عرض السجل النشط' : 'عرض المحذوفات'}</span>
+            </button>
+          )}
+          {isCentral && (
             <select
               value={filterHospital}
               onChange={(e) => setFilterHospital(e.target.value)}
@@ -312,7 +405,33 @@ export function AssetsView({ user, practitioners, equipments, hospitals }: Asset
         </div>
       </div>
 
-      {activeTab === 'practitioners' ? (
+      {showTrash ? (
+        activeTab === 'practitioners' ? (
+          <DataTable
+            key="trash-practitioners"
+            rows={trashedPractitioners}
+            columns={trashedPractitionerColumns}
+            rowKey={(p) => p.id}
+            actions={trashedPractitionerActions}
+            searchPlaceholder="بحث بالاسم، المسمى..."
+            emptyMessage="لا توجد سجلات محذوفة"
+            noMatchMessage="لا توجد سجلات مطابقة للبحث"
+            caption="سجل الممارسين المحذوفين"
+          />
+        ) : (
+          <DataTable
+            key="trash-equipment"
+            rows={trashedEquipments}
+            columns={trashedEquipmentColumns}
+            rowKey={(e) => e.id}
+            actions={trashedEquipmentActions}
+            searchPlaceholder="بحث بالاسم، النوع..."
+            emptyMessage="لا توجد سجلات محذوفة"
+            noMatchMessage="لا توجد سجلات مطابقة للبحث"
+            caption="سجل الأجهزة المحذوفة"
+          />
+        )
+      ) : activeTab === 'practitioners' ? (
         <DataTable
           // Both sub-sections render a DataTable at the same position, so without distinct keys React
           // reuses one instance and its search/sort/page state leaks between the tabs (FR-020).

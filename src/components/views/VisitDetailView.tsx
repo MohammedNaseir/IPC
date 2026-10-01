@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Plus,
   FileText,
@@ -18,10 +19,11 @@ import {
   ArrowLeft,
   X,
   Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import type { AuditLogDTO, SessionUser, VisitDTO } from '@/lib/types';
 import { formatDate, formatDateTime, formatFileSize } from '@/lib/format';
-import { addVisitAttachment, addVisitResponse, completeVisit, uploadVisitReport } from '@/server/actions/visits';
+import { addVisitAttachment, addVisitResponse, completeVisit, deleteVisit, uploadVisitReport } from '@/server/actions/visits';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 import { notify } from '@/lib/notify';
 
@@ -40,6 +42,7 @@ const FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.pptx
  */
 export function VisitDetailView({ user, visit, auditLogs }: VisitDetailViewProps) {
   const isCentral = user.role === 'central';
+  const router = useRouter();
   const { run, isPending } = useActionRunner();
 
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -115,6 +118,20 @@ export function VisitDetailView({ user, visit, auditLogs }: VisitDetailViewProps
     run(() => completeVisit(visit.id));
   };
 
+  // Soft delete (005-soft-delete, US3). No delete control is rendered at all once the visit is
+  // completed (FR-008) -- not merely disabled -- and the completed-visit refusal is enforced again,
+  // independently, both in the action and inside the Prisma extension itself (research.md R-004).
+  const handleDelete = async () => {
+    const proceed = await notify.confirm({
+      title: 'حذف الزيارة الرقابية',
+      body: 'سيتم حذف هذه الزيارة من سجل المستشفى. يمكن لمسؤول الإدارة المركزية استعادتها لاحقاً من سجل المحذوفات.',
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!proceed) return;
+    run(() => deleteVisit(visit.id), () => router.push('/visits'));
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
       {/* Breadcrumb and back path (FR-004). Excluded from print, like every other control. */}
@@ -172,6 +189,18 @@ export function VisitDetailView({ user, visit, auditLogs }: VisitDetailViewProps
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">طباعة PDF</span>
             </button>
+
+            {!isCompleted && (
+              <button
+                onClick={handleDelete}
+                disabled={isPending}
+                className="px-3.5 py-2 border border-danger-200 text-danger-800 hover:bg-danger-50 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-60"
+                title="حذف الزيارة"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">حذف الزيارة</span>
+              </button>
+            )}
 
             {isCentral && !isCompleted && (
               /* The one irreversible act in the product. Red and a lock, never green and a checkmark:

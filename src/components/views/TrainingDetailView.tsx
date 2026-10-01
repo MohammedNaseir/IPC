@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Plus,
   X,
@@ -17,7 +18,7 @@ import type { TrainingDTO } from '@/lib/types';
 import { formatDate, todayInputValue } from '@/lib/format';
 import { statusBadgeClass, statusDetailLabel } from '@/lib/training-status';
 import { ATTENDEE_NAME_MAX_LENGTH, MAX_ATTENDEE_NAMES, type ImportSummary } from '@/lib/attendance';
-import { importAttendanceNames, recordTrainingExecution } from '@/server/actions/trainings';
+import { deleteTraining, importAttendanceNames, recordTrainingExecution } from '@/server/actions/trainings';
 import { notify } from '@/lib/notify';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 
@@ -379,18 +380,43 @@ interface TrainingDetailViewProps {
  * function, execution form and all (feature 003, FR-012).
  */
 export function TrainingDetailView({ training }: TrainingDetailViewProps) {
+  const router = useRouter();
+  const { run } = useActionRunner();
+
+  // Soft delete (005-soft-delete, US3). No completed-training exception (spec Assumptions).
+  const handleDelete = async () => {
+    const confirmed = await notify.confirm({
+      title: 'حذف التدريب',
+      body: `سيتم حذف "${training.title}". يمكن استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteTraining(training.id), () => router.push('/trainings'));
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in" dir="rtl">
-      <div className="no-print flex items-center gap-2 text-xs text-slate-500">
-        <Link
-          href="/trainings"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-navy-700 hover:border-navy-300 transition-colors font-medium"
+      <div className="no-print flex items-center justify-between gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/trainings"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-navy-700 hover:border-navy-300 transition-colors font-medium"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 rotate-180" aria-hidden="true" />
+            <span>العودة لسجل التدريب</span>
+          </Link>
+          <span aria-hidden="true">/</span>
+          <span className="text-navy-700 font-medium truncate">{training.title}</span>
+        </div>
+        <button
+          onClick={handleDelete}
+          className="px-3.5 py-2 border border-danger-200 text-danger-800 hover:bg-danger-50 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+          title="حذف التدريب"
         >
-          <ArrowLeft className="w-3.5 h-3.5 rotate-180" aria-hidden="true" />
-          <span>العودة لسجل التدريب</span>
-        </Link>
-        <span aria-hidden="true">/</span>
-        <span className="text-navy-700 font-medium truncate">{training.title}</span>
+          <Trash2 className="w-4 h-4" />
+          <span className="hidden sm:inline">حذف التدريب</span>
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden p-6 space-y-6">

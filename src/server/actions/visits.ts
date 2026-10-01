@@ -1,8 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import type { Prisma } from '@/generated/prisma/client';
-import { prisma } from '@/server/db';
+import { prisma, prismaUnfiltered, type ExtendedTransactionClient } from '@/server/db';
 import { requireActionCentral, requireActionUser } from '@/server/auth/session';
 import { hospitalScope } from '@/server/auth/scope';
 import type { SessionUser } from '@/lib/types';
@@ -14,7 +13,7 @@ import { NotFoundError, ValidationError } from '@/server/errors';
 import { dateSchema, formString, idSchema, requiredText } from '@/server/validation';
 
 // Loads a visit the caller may act on and refuses writes once it is archived (FR-15).
-async function loadOpenVisit(tx: Prisma.TransactionClient, user: SessionUser, visitId: string) {
+async function loadOpenVisit(tx: ExtendedTransactionClient, user: SessionUser, visitId: string) {
   const visit = await tx.visit.findFirst({
     where: { id: visitId, ...hospitalScope(user) },
     select: { id: true, hospitalId: true, status: true },
@@ -119,6 +118,41 @@ export async function addVisitResponse(formData: FormData) {
         data: { visitId: visit.id, note, attachmentFileId, respondentName: actor.name },
       });
       await logAudit(tx, actor, 'Visit', visit.id, 'إضافة رد وتحديث على ملف الزيارة');
+    });
+
+    return null;
+  });
+}
+
+// Soft delete (005-soft-delete, US3). Reuses loadOpenVisit, so the completed-visit refusal (FR-008)
+// is the exact same check and the exact same Arabic message as every other write to a visit --
+// belt-and-suspenders with the Prisma extension's own refusal (research.md R-004): this is the
+// user-facing path, the extension is what holds even if some future code bypasses this action.
+export async function deleteVisit(visitId: string) {
+  return runAction(async () => {
+    const actor = await requireActionUser();
+    const id = idSchema.parse(visitId);
+
+    await prisma.$transaction(async (tx) => {
+      const visit = await loadOpenVisit(tx, actor, id);
+      await tx.visit.update({ where: { id: visit.id }, data: { deletedAt: new Date() } });
+      await logAudit(tx, actor, 'Visit', visit.id, 'حذف زيارة رقابية');
+    });
+
+    return null;
+  });
+}
+
+export async function restoreVisit(visitId: string) {
+  return runAction(async () => {
+    const actor = await requireActionCentral();
+    const id = idSchema.parse(visitId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await prismaUnfiltered.visit.findUnique({ where: { id } });
+      if (!existing || existing.deletedAt === null) throw new NotFoundError();
+      await tx.visit.update({ where: { id }, data: { deletedAt: null, deletionEventId: null } });
+      await logAudit(tx, actor, 'Visit', id, 'استعادة زيارة رقابية');
     });
 
     return null;

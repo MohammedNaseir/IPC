@@ -1,9 +1,20 @@
 import { requirePageUser } from '@/server/auth/session';
-import { listDocumentCenterFiles } from '@/server/queries/library';
+import { listDocumentCenterFiles, listTrashedDocumentCenterFiles } from '@/server/queries/library';
 import { DocumentsView } from '@/components/views/DocumentsView';
 
 export default async function DocCenterPage() {
   const user = await requirePageUser();
-  const docCenterItems = await listDocumentCenterFiles();
-  return <DocumentsView user={user} moduleType="docCenter" docCenterItems={docCenterItems} />;
+  const isCentral = user.role === 'central';
+  const [docCenterItems, trashedDocCenterItems] = await Promise.all([
+    listDocumentCenterFiles(),
+    isCentral ? listTrashedDocumentCenterFiles() : Promise.resolve([]),
+  ]);
+  return (
+    <DocumentsView
+      user={user}
+      moduleType="docCenter"
+      docCenterItems={docCenterItems}
+      trashedDocCenterItems={trashedDocCenterItems}
+    />
+  );
 }

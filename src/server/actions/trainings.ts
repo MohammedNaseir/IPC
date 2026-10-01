@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { prisma } from '@/server/db';
+import { prisma, prismaUnfiltered } from '@/server/db';
 import { requireActionCentral, requireActionUser } from '@/server/auth/session';
 import { assertHospitalAccess, hospitalScope } from '@/server/auth/scope';
 import { logAudit } from '@/server/audit';
@@ -90,6 +90,42 @@ export async function createInternalTraining(input: z.input<typeof internalTrain
   });
 }
 
+// Soft delete (005-soft-delete, US6). Central-only, matching createTrainingTemplate. Deliberately
+// never cascades to the Training rows created from this template (spec FR-012, data-model.md) --
+// those are independent historical compliance records regardless of whether the template still
+// exists, so this is a plain leaf delete, not a cascade.
+export async function deleteTrainingTemplate(templateId: string) {
+  return runAction(async () => {
+    const actor = await requireActionCentral();
+    const id = idSchema.parse(templateId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.trainingTemplate.findUnique({ where: { id } });
+      if (!existing) throw new NotFoundError();
+      await tx.trainingTemplate.update({ where: { id }, data: { deletedAt: new Date() } });
+      await logAudit(tx, actor, 'TrainingTemplate', id, `حذف قالب تدريبي مركزي: ${existing.title}`);
+    });
+
+    return null;
+  });
+}
+
+export async function restoreTrainingTemplate(templateId: string) {
+  return runAction(async () => {
+    const actor = await requireActionCentral();
+    const id = idSchema.parse(templateId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await prismaUnfiltered.trainingTemplate.findUnique({ where: { id } });
+      if (!existing || existing.deletedAt === null) throw new NotFoundError();
+      await tx.trainingTemplate.update({ where: { id }, data: { deletedAt: null, deletionEventId: null } });
+      await logAudit(tx, actor, 'TrainingTemplate', id, `استعادة قالب تدريبي مركزي: ${existing.title}`);
+    });
+
+    return null;
+  });
+}
+
 export async function recordTrainingExecution(formData: FormData) {
   return runAction(async () => {
     const actor = await requireActionUser();
@@ -127,6 +163,40 @@ export async function recordTrainingExecution(formData: FormData) {
         training.id,
         `توثيق تنفيذ التدريب "${training.title}" ورصد حضور ${attendees} ${how}`,
       );
+    });
+
+    return null;
+  });
+}
+
+// Soft delete (005-soft-delete, US3). No completed-training exception -- the SRS's immutability
+// rule, and spec FR-008's protection, is scoped to a completed Visit only (spec Assumptions).
+export async function deleteTraining(trainingId: string) {
+  return runAction(async () => {
+    const actor = await requireActionUser();
+    const id = idSchema.parse(trainingId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.training.findFirst({ where: { id, ...hospitalScope(actor) } });
+      if (!existing) throw new NotFoundError('التدريب غير موجود أو لا تملك صلاحية الوصول إليه.');
+      await tx.training.update({ where: { id }, data: { deletedAt: new Date() } });
+      await logAudit(tx, actor, 'Training', id, `حذف تدريب: ${existing.title}`);
+    });
+
+    return null;
+  });
+}
+
+export async function restoreTraining(trainingId: string) {
+  return runAction(async () => {
+    const actor = await requireActionCentral();
+    const id = idSchema.parse(trainingId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await prismaUnfiltered.training.findUnique({ where: { id } });
+      if (!existing || existing.deletedAt === null) throw new NotFoundError();
+      await tx.training.update({ where: { id }, data: { deletedAt: null, deletionEventId: null } });
+      await logAudit(tx, actor, 'Training', id, `استعادة تدريب: ${existing.title}`);
     });
 
     return null;

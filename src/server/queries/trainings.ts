@@ -1,8 +1,16 @@
 import 'server-only';
-import { prisma } from '@/server/db';
-import type { SessionUser, TrainingDTO, TrainingStatus } from '@/lib/types';
+import { prisma, prismaUnfiltered } from '@/server/db';
+import type {
+  SessionUser,
+  TrainingDTO,
+  TrainingStatus,
+  TrainingTemplateDTO,
+  TrashedTrainingDTO,
+  TrashedTrainingTemplateDTO,
+} from '@/lib/types';
 import { hospitalScope } from '@/server/auth/scope';
 import { fileRefSelect, iso, toFileRef } from '@/server/queries/mappers';
+import { attachTrashMeta } from '@/server/queries/trash';
 
 // FR-22: a required (template) training that is not completed past its due date is late.
 export function deriveTrainingStatus(stored: TrainingStatus, dueDate: Date | null, now = new Date()): TrainingStatus {
@@ -89,6 +97,55 @@ export async function findTrainingForUser(user: SessionUser, trainingId: string)
     include: trainingInclude,
   });
   return row ? toTrainingDTO(row, new Date()) : null;
+}
+
+// New, minimal surface (005-soft-delete, US6) -- there was no existing screen listing
+// TrainingTemplate master records, needed so a central user has somewhere to delete one from.
+export async function listTrainingTemplates(): Promise<TrainingTemplateDTO[]> {
+  const rows = await prisma.trainingTemplate.findMany({
+    orderBy: { createdAt: 'desc' },
+    // Soft delete (005-soft-delete, R-010): a nested `_count` is not covered by the extension's
+    // read-filtering, so a deleted Training would otherwise still inflate this count.
+    include: { _count: { select: { trainings: { where: { deletedAt: null } } } } },
+  });
+  return rows.map((t) => ({
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    dueDate: iso(t.dueDate),
+    trainingCount: t._count.trainings,
+    createdAt: iso(t.createdAt),
+  }));
+}
+
+export async function listTrashedTrainingTemplates(): Promise<TrashedTrainingTemplateDTO[]> {
+  const rows = await prismaUnfiltered.trainingTemplate.findMany({
+    where: { deletedAt: { not: null } },
+    orderBy: { deletedAt: 'desc' },
+  });
+  return attachTrashMeta(
+    'TrainingTemplate',
+    rows.map((t) => ({ id: t.id, title: t.title, deletedAt: t.deletedAt })),
+  );
+}
+
+// Trash listing (005-soft-delete, US3). Central-only by convention.
+export async function listTrashedTrainings(): Promise<TrashedTrainingDTO[]> {
+  const rows = await prismaUnfiltered.training.findMany({
+    where: { deletedAt: { not: null } },
+    orderBy: { deletedAt: 'desc' },
+    include: { hospital: { select: { name: true } } },
+  });
+  return attachTrashMeta(
+    'Training',
+    rows.map((t) => ({
+      id: t.id,
+      hospitalId: t.hospitalId,
+      hospitalName: t.hospital.name,
+      title: t.title,
+      deletedAt: t.deletedAt,
+    })),
+  );
 }
 
 /**

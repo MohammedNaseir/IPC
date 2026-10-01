@@ -44,30 +44,47 @@ enum NotificationType {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  passwordHash   String
-  name           String
-  role           Role
+  id              String    @id @default(cuid())
+  // Not @unique at the Prisma level: uniqueness among active rows is enforced by a partial index
+  // (WHERE "deletedAt" IS NULL, see migration 005-soft-delete) so a deleted coordinator's email is
+  // immediately reusable. findUnique({ where: { email } }) is therefore not available — use
+  // findFirst instead (see src/server/actions/auth.ts).
+  email           String
+  passwordHash    String
+  name            String
+  role            Role
   // Unique: SRS §6 allows exactly one coordinator account per hospital. Null for central users.
-  hospitalId     String?  @unique
+  // Kept @unique (unlike email) so Hospital.coordinator stays a one-to-one relation — freeing a
+  // deleted coordinator's hospital slot is handled in addCoordinator, not here (005-soft-delete
+  // research.md R-005).
+  hospitalId      String?   @unique
   // Incremented on password/email change to invalidate existing sessions.
-  sessionVersion Int      @default(0)
-  createdAt      DateTime @default(now())
+  sessionVersion  Int       @default(0)
+  createdAt       DateTime  @default(now())
+  // Soft delete (005-soft-delete). Null = active. Set together with deletionEventId when part of
+  // a cascade (e.g. the coordinator of a deleted Hospital); deletionEventId stays null otherwise.
+  deletedAt       DateTime?
+  deletionEventId String?
 
   hospital      Hospital?      @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
   notifications Notification[]
   auditLogs     AuditLog[]
   uploadedFiles StoredFile[]
+
+  @@index([deletedAt])
 }
 
 model Hospital {
-  id        String   @id @default(cuid())
-  name      String
-  location  String
-  type      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id              String    @id @default(cuid())
+  name            String
+  location        String
+  type            String
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  // Soft delete (005-soft-delete). Cascades to the coordinator, and to every Visit/Training/
+  // Practitioner/Equipment row scoped to this hospital, except a completed Visit (never deletable).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   coordinator   User?
   visits        Visit[]
@@ -75,6 +92,8 @@ model Hospital {
   practitioners Practitioner[]
   equipments    Equipment[]
   files         StoredFile[]
+
+  @@index([deletedAt])
 }
 
 model Visit {
@@ -88,6 +107,11 @@ model Visit {
   complianceScore Float?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  // Soft delete (005-soft-delete). A Visit with status 'completed' MUST NEVER have this set — by
+  // any path, including a Hospital cascade, which skips a completed Visit rather than deleting it
+  // (SRS reliability requirement; enforced in the Prisma extension, not only in application code).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   hospital    Hospital          @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
   reportFile  StoredFile?       @relation("VisitReport", fields: [reportFileId], references: [id], onDelete: SetNull)
@@ -95,6 +119,7 @@ model Visit {
   responses   VisitResponse[]
 
   @@index([hospitalId])
+  @@index([deletedAt])
 }
 
 model VisitAttachment {
@@ -140,26 +165,35 @@ model AuditLog {
 }
 
 model TrainingTemplate {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  dueDate     DateTime
-  createdAt   DateTime @default(now())
+  id              String    @id @default(cuid())
+  title           String
+  description     String
+  dueDate         DateTime
+  createdAt       DateTime  @default(now())
+  // Soft delete (005-soft-delete). Never cascades to Training rows created from this template —
+  // those are independent historical records regardless of whether the template still exists.
+  deletedAt       DateTime?
+  deletionEventId String?
 
   trainings Training[]
+
+  @@index([deletedAt])
 }
 
 model Training {
-  id          String         @id @default(cuid())
-  templateId  String?
-  hospitalId  String
-  title       String
-  description String
-  deliveredBy String?
-  date        DateTime?
-  notes       String?
-  status      TrainingStatus @default(pending)
-  createdAt   DateTime       @default(now())
+  id              String         @id @default(cuid())
+  templateId      String?
+  hospitalId      String
+  title           String
+  description     String
+  deliveredBy     String?
+  date            DateTime?
+  notes           String?
+  status          TrainingStatus @default(pending)
+  createdAt       DateTime       @default(now())
+  // Soft delete (005-soft-delete).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   template    TrainingTemplate?    @relation(fields: [templateId], references: [id], onDelete: Restrict)
   hospital    Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
@@ -168,6 +202,7 @@ model Training {
 
   @@unique([templateId, hospitalId])
   @@index([hospitalId])
+  @@index([deletedAt])
 }
 
 model TrainingAttachment {
@@ -198,18 +233,22 @@ model TrainingAttendance {
 }
 
 model Practitioner {
-  id            String   @id @default(cuid())
-  hospitalId    String
-  name          String
-  role          String
-  licenseNumber String?
-  email         String?
-  phone         String?
-  createdAt     DateTime @default(now())
+  id              String    @id @default(cuid())
+  hospitalId      String
+  name            String
+  role            String
+  licenseNumber   String?
+  email           String?
+  phone           String?
+  createdAt       DateTime  @default(now())
+  // Soft delete (005-soft-delete).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
 
   @@index([hospitalId])
+  @@index([deletedAt])
 }
 
 model Equipment {
@@ -221,58 +260,85 @@ model Equipment {
   status          String?
   lastMaintenance DateTime?
   createdAt       DateTime  @default(now())
+  // Soft delete (005-soft-delete).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
 
   @@index([hospitalId])
+  @@index([deletedAt])
 }
 
 model Policy {
-  id         String         @id @default(cuid())
-  title      String
-  category   PolicyCategory
-  version    String         @default("1.0")
-  fileId     String         @unique
-  uploadedAt DateTime       @default(now())
+  id              String         @id @default(cuid())
+  title           String
+  category        PolicyCategory
+  version         String         @default("1.0")
+  fileId          String         @unique
+  uploadedAt      DateTime       @default(now())
+  // Soft delete (005-soft-delete).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   file StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([deletedAt])
 }
 
 model OrgDocument {
-  id         String     @id @default(cuid())
-  title      String
-  type       OrgDocType
-  fileId     String     @unique
-  uploadedAt DateTime   @default(now())
+  id              String     @id @default(cuid())
+  title           String
+  type            OrgDocType
+  fileId          String     @unique
+  uploadedAt      DateTime   @default(now())
+  // Soft delete (005-soft-delete).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   file StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([deletedAt])
 }
 
 model DocumentCenterFile {
-  id         String   @id @default(cuid())
-  title      String
-  fileId     String   @unique
-  uploadedAt DateTime @default(now())
+  id              String    @id @default(cuid())
+  title           String
+  fileId          String    @unique
+  uploadedAt      DateTime  @default(now())
+  // Soft delete (005-soft-delete).
+  deletedAt       DateTime?
+  deletionEventId String?
 
   file StoredFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([deletedAt])
 }
 
 model Program {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  createdAt       DateTime  @default(now())
+  // Soft delete (005-soft-delete). Cascades to every folder and file it contains, at any depth.
+  deletedAt       DateTime?
+  deletionEventId String?
 
   folders ProgramFolder[]
   files   ProgramFile[]
+
+  @@index([deletedAt])
 }
 
 model ProgramFolder {
-  id             String  @id @default(cuid())
-  programId      String
-  parentFolderId String?
-  name           String
-  description    String?
+  id              String    @id @default(cuid())
+  programId       String
+  parentFolderId  String?
+  name            String
+  description     String?
+  // Soft delete (005-soft-delete). Cascades to its own subtree (subfolders and files) only.
+  deletedAt       DateTime?
+  deletionEventId String?
 
   program      Program         @relation(fields: [programId], references: [id], onDelete: Restrict)
   parentFolder ProgramFolder?  @relation("SubFolders", fields: [parentFolderId], references: [id], onDelete: Restrict)
@@ -280,21 +346,27 @@ model ProgramFolder {
   files        ProgramFile[]
 
   @@index([programId])
+  @@index([deletedAt])
 }
 
 model ProgramFile {
-  id        String   @id @default(cuid())
-  programId String
-  folderId  String?
-  name      String
-  fileId    String   @unique
-  createdAt DateTime @default(now())
+  id              String    @id @default(cuid())
+  programId       String
+  folderId        String?
+  name            String
+  fileId          String    @unique
+  createdAt       DateTime  @default(now())
+  // Soft delete (005-soft-delete). Unlike other child/attachment rows, a ProgramFile can be
+  // deleted on its own (not only cascaded with its folder or program), so it needs its own marker.
+  deletedAt       DateTime?
+  deletionEventId String?
 
   program Program        @relation(fields: [programId], references: [id], onDelete: Restrict)
   folder  ProgramFolder? @relation(fields: [folderId], references: [id], onDelete: Restrict)
   file    StoredFile     @relation(fields: [fileId], references: [id], onDelete: Restrict)
 
   @@index([programId])
+  @@index([deletedAt])
 }
 
 model Notification {

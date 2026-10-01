@@ -219,6 +219,36 @@ what, and whether the SRS document itself still needs a manual update.
 - **Status**: recorded exception, not an SRS conflict — the SRS is silent on this point, so there is
   nothing in it to amend.
 
+### D-004 — Soft delete added across every top-level module (2026-10-01)
+
+- **Superseded**: nothing specific — the SRS's FR-1…FR-43 describe each module's create/edit/delete
+  architecture without specifying delete semantics, and §6 (Exclusions) says nothing about recovery
+  or an undo path. This is new scope the SRS does not itself define, not a conflict with it.
+- **Superseded by**: `specs/005-soft-delete/spec.md`.
+- **Reason**: central staff could irreversibly delete a hospital, a coordinator account, or any
+  other record with no way to undo a mistake. Soft delete adds a recoverable "trash" instead.
+- **New rule**: every top-level module (Hospitals, Visits, Trainings + Templates, Practitioners,
+  Equipment, Policies, OrgDocuments, DocCenterFiles, Programs + Folders/Files, coordinator accounts)
+  gained `deletedAt`/`deletionEventId` columns and a Prisma Client Extension
+  (`src/server/db/softDelete.ts`) that filters every top-level read and refuses direct
+  `.delete()`/`.deleteMany()` calls on in-scope models outright. Delete permission mirrors each
+  module's existing edit permission. Restore is central-only, through a per-module trash view.
+  Deleting a Hospital cascades to its coordinator, practitioners, equipment, trainings, and
+  non-completed visits (a completed Visit is deliberately excluded — archival history is never
+  touched); deleting a coordinator cascades with its hospital, not the reverse. Deleting a Program
+  or ProgramFolder cascades to its full subtree at any depth. One fresh `deletionEventId` (not a
+  boolean) groups everything touched by a single cascade, so restoring a parent brings back exactly
+  that set — not a sibling deleted independently, before or after.
+- **Verified consequence, not merely asserted**: a Prisma Client Extension's `query` component only
+  intercepts top-level `prisma.<model>.<operation>()` calls, not nested `include`/`select`/`where`
+  relation reads — confirmed by a failing repro (a soft-deleted coordinator kept surfacing through
+  `hospital.findUnique({ select: { coordinator: ... } })`) before any cascade logic was written on
+  top of it. Every read this feature added or touched (`listHospitals`, the hospital-cascade
+  gatherer, the program-cascade gatherer) uses separate top-level queries merged in application
+  code instead of nested includes — see `research.md` R-010 in the feature's spec folder.
+- **Status**: recorded exception, not an SRS conflict — the SRS is silent on delete semantics, so
+  there is nothing in it to amend.
+
 ### D-001 — Training attendance is not linked to Practitioner (2026-09-27)
 
 - **Superseded**: SRS **FR-21** ("attendance recorded two ways: names linked to the practitioner

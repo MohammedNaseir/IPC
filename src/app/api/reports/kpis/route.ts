@@ -32,8 +32,12 @@ export async function GET(request: Request) {
   const hospitals = await prisma.hospital.findMany({
     orderBy: { name: 'asc' },
     include: {
-      visits: { where: { visitDate: { gte: from, lte: to } }, select: { status: true, complianceScore: true } },
+      // Soft delete (005-soft-delete, R-010): a nested `include` on a to-many relation is not
+      // covered by the extension's read-filtering, so a deleted Visit/Training would otherwise
+      // still inflate this export's counts -- filtered explicitly here instead.
+      visits: { where: { visitDate: { gte: from, lte: to }, deletedAt: null }, select: { status: true, complianceScore: true } },
       trainings: {
+        where: { deletedAt: null },
         select: { status: true, date: true, createdAt: true, template: { select: { dueDate: true } } },
       },
     },

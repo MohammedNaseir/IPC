@@ -1,8 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import { prisma } from '@/server/db';
-import { requireActionUser } from '@/server/auth/session';
+import { prisma, prismaUnfiltered } from '@/server/db';
+import { requireActionCentral, requireActionUser } from '@/server/auth/session';
 import { assertHospitalAccess, hospitalScope } from '@/server/auth/scope';
 import { logAudit } from '@/server/audit';
 import { runAction } from '@/server/run-action';
@@ -51,6 +51,39 @@ export async function updateEquipment(equipmentId: string, input: z.input<typeof
       }
       await tx.equipment.update({ where: { id }, data });
       await logAudit(tx, actor, 'Equipment', id, `تعديل بيانات جهاز مكافحة عدوى: ${data.name}`);
+    });
+
+    return null;
+  });
+}
+
+// Soft delete (005-soft-delete, US1). Permission mirrors updateEquipment exactly.
+export async function deleteEquipment(equipmentId: string) {
+  return runAction(async () => {
+    const actor = await requireActionUser();
+    const id = idSchema.parse(equipmentId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.equipment.findFirst({ where: { id, ...hospitalScope(actor) } });
+      if (!existing) throw new NotFoundError();
+      await tx.equipment.update({ where: { id }, data: { deletedAt: new Date() } });
+      await logAudit(tx, actor, 'Equipment', id, `حذف جهاز مكافحة عدوى: ${existing.name}`);
+    });
+
+    return null;
+  });
+}
+
+export async function restoreEquipment(equipmentId: string) {
+  return runAction(async () => {
+    const actor = await requireActionCentral();
+    const id = idSchema.parse(equipmentId);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await prismaUnfiltered.equipment.findUnique({ where: { id } });
+      if (!existing || existing.deletedAt === null) throw new NotFoundError();
+      await tx.equipment.update({ where: { id }, data: { deletedAt: null, deletionEventId: null } });
+      await logAudit(tx, actor, 'Equipment', id, `استعادة جهاز مكافحة عدوى: ${existing.name}`);
     });
 
     return null;

@@ -3,34 +3,61 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, Plus, X } from 'lucide-react';
-import type { HospitalDTO, SessionUser, TrainingDTO } from '@/lib/types';
-import type { ColumnDef } from '@/lib/table';
+import { GraduationCap, Plus, X, Trash2, ArchiveRestore, Settings2 } from 'lucide-react';
+import type {
+  HospitalDTO,
+  SessionUser,
+  TrainingDTO,
+  TrainingTemplateDTO,
+  TrashedTrainingDTO,
+  TrashedTrainingTemplateDTO,
+} from '@/lib/types';
+import type { ColumnDef, RowAction } from '@/lib/table';
 import { DataTable } from '@/components/table/DataTable';
 import { readListFilters, writeListFilters } from '@/components/table/listStateStore';
 import { formatDate, todayInputValue } from '@/lib/format';
 import { statusBadgeClass, statusLabel } from '@/lib/training-status';
-import { createInternalTraining, createTrainingTemplate } from '@/server/actions/trainings';
+import { notify } from '@/lib/notify';
+import {
+  createInternalTraining,
+  createTrainingTemplate,
+  deleteTraining,
+  deleteTrainingTemplate,
+  restoreTraining,
+  restoreTrainingTemplate,
+} from '@/server/actions/trainings';
 import { useActionRunner } from '@/components/hooks/useActionRunner';
 
 interface TrainingsViewProps {
   user: SessionUser;
   trainings: TrainingDTO[];
   hospitals: HospitalDTO[];
+  // Soft delete (005-soft-delete, US3/US6). Always empty for a non-central user.
+  trashedTrainings: TrashedTrainingDTO[];
+  templates: TrainingTemplateDTO[];
+  trashedTemplates: TrashedTrainingTemplateDTO[];
 }
 
 // One key for this screen's table and its three filter selects.
 const LIST_KEY = 'trainings';
 
-export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps) {
+export function TrainingsView({ user, trainings, hospitals, trashedTrainings, templates, trashedTemplates }: TrainingsViewProps) {
   const isCentral = user.role === 'central';
   const router = useRouter();
+  // Soft delete (005-soft-delete, US6): a collapsible central-only panel -- there was no existing
+  // screen listing TrainingTemplate master records on their own (only the per-hospital Training
+  // copies distributed from one), so this is new, minimal surface rather than an extension of an
+  // existing table.
+  const [showTemplatesPanel, setShowTemplatesPanel] = useState(false);
+  const [showTemplatesTrash, setShowTemplatesTrash] = useState(false);
   const { run, isPending } = useActionRunner();
 
   const [filterType, setFilterType] = useState<string>(() => readListFilters(LIST_KEY)?.type ?? 'all');
   const [filterStatus, setFilterStatus] = useState<string>(() => readListFilters(LIST_KEY)?.status ?? 'all');
   const [filterHospital, setFilterHospital] = useState<string>(() => readListFilters(LIST_KEY)?.hospital ?? '');
   const [visibleCount, setVisibleCount] = useState<number | null>(null);
+  // Soft delete (005-soft-delete, US3): central-only toggle swapping the active table for its trash.
+  const [showTrash, setShowTrash] = useState(false);
 
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showInternalModal, setShowInternalModal] = useState(false);
@@ -143,6 +170,65 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
     [],
   );
 
+  // Soft delete (005-soft-delete, US3). No completed-training exception -- unlike a Visit, a
+  // completed Training can still be deleted (spec Assumptions).
+  const handleDelete = async (t: TrainingDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف التدريب',
+      body: `سيتم حذف "${t.title}". يمكن استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteTraining(t.id));
+  };
+  const handleRestore = (t: TrashedTrainingDTO) => run(() => restoreTraining(t.id));
+
+  const trainingActions: RowAction<TrainingDTO>[] = [{ label: 'حذف التدريب', icon: Trash2, onSelect: handleDelete }];
+  const trashedTrainingActions: RowAction<TrashedTrainingDTO>[] = [
+    { label: 'استعادة التدريب', icon: ArchiveRestore, onSelect: handleRestore },
+  ];
+
+  const trashedTrainingColumns: ColumnDef<TrashedTrainingDTO>[] = [
+    { key: 'title', header: 'عنوان الدورة', value: (t) => t.title },
+    { key: 'hospitalName', header: 'المستشفى', value: (t) => t.hospitalName },
+    { key: 'deletedByName', header: 'حذف بواسطة', value: (t) => t.deletedByName },
+    { key: 'deletedAt', header: 'تاريخ الحذف', type: 'date', value: (t) => t.deletedAt, render: (t) => <span className="whitespace-nowrap">{formatDate(t.deletedAt)}</span> },
+  ];
+
+  // Soft delete (005-soft-delete, US6). Never cascades to the Training rows created from a template
+  // (spec FR-012) -- those stay fully intact regardless of the template's own status.
+  const handleDeleteTemplate = async (t: TrainingTemplateDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف القالب التدريبي',
+      body: `سيتم حذف قالب "${t.title}". لن يتأثر أي من التدريبات (${t.trainingCount}) التي تم توزيعها منه سابقاً. يمكن استعادة القالب لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteTrainingTemplate(t.id));
+  };
+  const handleRestoreTemplate = (t: TrashedTrainingTemplateDTO) => run(() => restoreTrainingTemplate(t.id));
+
+  const templateActions: RowAction<TrainingTemplateDTO>[] = [
+    { label: 'حذف القالب', icon: Trash2, onSelect: handleDeleteTemplate },
+  ];
+  const trashedTemplateActions: RowAction<TrashedTrainingTemplateDTO>[] = [
+    { label: 'استعادة القالب', icon: ArchiveRestore, onSelect: handleRestoreTemplate },
+  ];
+
+  const templateColumns: ColumnDef<TrainingTemplateDTO>[] = [
+    { key: 'title', header: 'عنوان القالب', value: (t) => t.title, render: (t) => <span className="font-bold text-slate-900">{t.title}</span> },
+    { key: 'dueDate', header: 'الموعد النهائي', type: 'date', value: (t) => t.dueDate, render: (t) => <span className="whitespace-nowrap">{formatDate(t.dueDate)}</span> },
+    { key: 'trainingCount', header: 'عدد المستشفيات الموزع عليها', type: 'number', align: 'end', value: (t) => t.trainingCount },
+    { key: 'createdAt', header: 'تاريخ الإنشاء', type: 'date', value: (t) => t.createdAt, render: (t) => <span className="whitespace-nowrap">{formatDate(t.createdAt)}</span> },
+  ];
+  const trashedTemplateColumns: ColumnDef<TrashedTrainingTemplateDTO>[] = [
+    { key: 'title', header: 'عنوان القالب', value: (t) => t.title },
+    { key: 'deletedByName', header: 'حذف بواسطة', value: (t) => t.deletedByName },
+    { key: 'deletedAt', header: 'تاريخ الحذف', type: 'date', value: (t) => t.deletedAt, render: (t) => <span className="whitespace-nowrap">{formatDate(t.deletedAt)}</span> },
+  ];
+
   const handleTemplateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     run(
@@ -199,6 +285,30 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
         </div>
 
         <div className="flex items-center gap-2 no-print">
+          {isCentral && (
+            <button
+              onClick={() => setShowTrash((v) => !v)}
+              aria-pressed={showTrash}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                showTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {showTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{showTrash ? 'عرض السجل النشط' : 'عرض المحذوفات'}</span>
+            </button>
+          )}
+          {isCentral && (
+            <button
+              onClick={() => setShowTemplatesPanel((v) => !v)}
+              aria-pressed={showTemplatesPanel}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                showTemplatesPanel ? 'bg-navy-50 text-navy-800 border-navy-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+              }`}
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              <span>إدارة القوالب التدريبية</span>
+            </button>
+          )}
           {isCentral && (
             <button
               onClick={() => setShowTemplateModal(true)}
@@ -271,18 +381,84 @@ export function TrainingsView({ user, trainings, hospitals }: TrainingsViewProps
         </div>
       </div>
 
-      <DataTable
-        rows={scopedTrainings}
-        columns={trainingColumns}
-        rowKey={(t) => t.id}
-        onRowSelect={(t) => router.push(`/trainings/${t.id}`)}
-        onStateChange={handleTableState}
-        stateKey={LIST_KEY}
-        searchPlaceholder="بحث في الدورات، المستشفيات، المحتوى..."
-        emptyMessage="لا توجد دورات تدريبية مسجلة بعد"
-        noMatchMessage="لا توجد تدريبات مطابقة"
-        caption="سجل الدورات التدريبية"
-      />
+      {isCentral && showTemplatesPanel && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-navy-700" />
+                القوالب التدريبية المركزية
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                حذف قالب لا يؤثر على التدريبات الموزعة سابقاً من خلاله — تبقى سجلات تاريخية مستقلة
+              </p>
+            </div>
+            <button
+              onClick={() => setShowTemplatesTrash((v) => !v)}
+              aria-pressed={showTemplatesTrash}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                showTemplatesTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {showTemplatesTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{showTemplatesTrash ? 'عرض القوالب النشطة' : 'عرض القوالب المحذوفة'}</span>
+            </button>
+          </div>
+
+          {showTemplatesTrash ? (
+            <DataTable
+              key="templates-trash"
+              rows={trashedTemplates}
+              columns={trashedTemplateColumns}
+              rowKey={(t) => t.id}
+              actions={trashedTemplateActions}
+              searchPlaceholder="بحث بعنوان القالب..."
+              emptyMessage="لا توجد قوالب محذوفة"
+              noMatchMessage="لا توجد سجلات مطابقة للبحث"
+              caption="سجل القوالب التدريبية المحذوفة"
+            />
+          ) : (
+            <DataTable
+              key="templates"
+              rows={templates}
+              columns={templateColumns}
+              rowKey={(t) => t.id}
+              actions={templateActions}
+              searchPlaceholder="بحث بعنوان القالب..."
+              emptyMessage="لا توجد قوالب تدريبية مركزية بعد"
+              noMatchMessage="لا توجد قوالب مطابقة للبحث"
+              caption="سجل القوالب التدريبية المركزية"
+            />
+          )}
+        </div>
+      )}
+
+      {showTrash ? (
+        <DataTable
+          rows={trashedTrainings}
+          columns={trashedTrainingColumns}
+          rowKey={(t) => t.id}
+          actions={trashedTrainingActions}
+          searchPlaceholder="بحث في التدريبات المحذوفة..."
+          emptyMessage="لا توجد سجلات محذوفة"
+          noMatchMessage="لا توجد سجلات مطابقة للبحث"
+          caption="سجل التدريبات المحذوفة"
+        />
+      ) : (
+        <DataTable
+          rows={scopedTrainings}
+          columns={trainingColumns}
+          rowKey={(t) => t.id}
+          actions={trainingActions}
+          onRowSelect={(t) => router.push(`/trainings/${t.id}`)}
+          onStateChange={handleTableState}
+          stateKey={LIST_KEY}
+          searchPlaceholder="بحث في الدورات، المستشفيات، المحتوى..."
+          emptyMessage="لا توجد دورات تدريبية مسجلة بعد"
+          noMatchMessage="لا توجد تدريبات مطابقة"
+          caption="سجل الدورات التدريبية"
+        />
+      )}
 
       {showTemplateModal && isCentral && (
         <div

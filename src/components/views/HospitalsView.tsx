@@ -25,14 +25,29 @@ import {
   Eye,
   EyeOff,
   UserPlus,
+  Trash2,
+  ArchiveRestore,
 } from 'lucide-react';
-import type { EquipmentDTO, HospitalDTO, PractitionerDTO, TrainingDTO, VisitDTO } from '@/lib/types';
+import type {
+  EquipmentDTO,
+  HospitalDTO,
+  PractitionerDTO,
+  TrainingDTO,
+  VisitDTO,
+  TrashedCoordinatorDTO,
+  TrashedHospitalDTO,
+} from '@/lib/types';
 import type { ColumnDef, RowAction } from '@/lib/table';
 import { DataTable } from '@/components/table/DataTable';
 import { formatDate } from '@/lib/format';
+import { notify } from '@/lib/notify';
 import {
   addCoordinator,
   createHospital,
+  deleteCoordinator,
+  deleteHospital,
+  restoreCoordinator,
+  restoreHospital,
   toggleHospitalStatus,
   updateCoordinator,
   updateHospital,
@@ -45,6 +60,9 @@ interface HospitalsViewProps {
   trainings: TrainingDTO[];
   practitioners: PractitionerDTO[];
   equipments: EquipmentDTO[];
+  // Soft delete (005-soft-delete, US4/US6). This whole page is already central-only (requirePageCentral).
+  trashedCoordinators: TrashedCoordinatorDTO[];
+  trashedHospitals: TrashedHospitalDTO[];
 }
 
 interface EditingCoordinator {
@@ -54,11 +72,22 @@ interface EditingCoordinator {
   email: string;
 }
 
-export function HospitalsView({ hospitals, visits, trainings, practitioners, equipments }: HospitalsViewProps) {
+export function HospitalsView({
+  hospitals,
+  visits,
+  trainings,
+  practitioners,
+  equipments,
+  trashedCoordinators,
+  trashedHospitals,
+}: HospitalsViewProps) {
   const router = useRouter();
   const { run, isPending } = useActionRunner();
 
   const [activeSubTab, setActiveSubTab] = useState<'hospitals' | 'coordinators'>('hospitals');
+  // Soft delete (005-soft-delete, US4/US6): toggles each sub-tab's table for its own trash.
+  const [showHospitalTrash, setShowHospitalTrash] = useState(false);
+  const [showCoordinatorTrash, setShowCoordinatorTrash] = useState(false);
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingHospital, setEditingHospital] = useState<HospitalDTO | null>(null);
@@ -368,11 +397,51 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
     },
   ];
 
+  // Soft delete (005-soft-delete, US4). The first cascading case -- the confirmation says so plainly,
+  // since this is the one delete in the whole feature that takes more than the named record with it.
+  const handleDeleteHospital = async (h: HospitalDTO) => {
+    const confirmed = await notify.confirm({
+      title: 'حذف المستشفى',
+      body: `سيتم حذف مستشفى "${h.name}"${h.coordinator ? ` وحساب المنسق "${h.coordinator.name}"` : ''} وكل الممارسين والأجهزة والتدريبات والزيارات غير المكتملة التابعة له. الزيارات المكتملة والمؤرشفة تبقى كما هي دون أي تأثير. يمكن استعادة كل ذلك معاً لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف المستشفى وكل ما يتبعه',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteHospital(h.id));
+  };
+  const handleRestoreHospital = (h: TrashedHospitalDTO) => run(() => restoreHospital(h.id));
+
   const hospitalActions: RowAction<HospitalDTO>[] = [
     { label: 'البروفايل الشامل', icon: Sparkles, tone: 'primary', onSelect: (h) => setSelectedHospitalId(h.id) },
     { label: 'تعديل بيانات المستشفى', icon: Edit2, onSelect: handleOpenEdit },
     { label: 'تفعيل / تعطيل المستشفى', icon: Power, onSelect: (h) => run(() => toggleHospitalStatus(h.id)) },
+    { label: 'حذف المستشفى', icon: Trash2, onSelect: handleDeleteHospital },
   ];
+
+  const trashedHospitalActions: RowAction<TrashedHospitalDTO>[] = [
+    { label: 'استعادة المستشفى', icon: ArchiveRestore, onSelect: handleRestoreHospital },
+  ];
+  const trashedHospitalColumns: ColumnDef<TrashedHospitalDTO>[] = [
+    { key: 'name', header: 'اسم المستشفى', value: (h) => h.name, render: (h) => <span className="font-bold text-slate-900">{h.name}</span> },
+    { key: 'location', header: 'الموقع', value: (h) => h.location },
+    { key: 'type', header: 'نوع المنشأة', value: (h) => h.type },
+    { key: 'deletedByName', header: 'حذف بواسطة', value: (h) => h.deletedByName },
+    { key: 'deletedAt', header: 'تاريخ الحذف', type: 'date', value: (h) => h.deletedAt, render: (h) => <span className="whitespace-nowrap">{formatDate(h.deletedAt)}</span> },
+  ];
+
+  // Soft delete (005-soft-delete, US6). Central-only, matching this whole page's requirePageCentral gate.
+  const handleDeleteCoordinator = async (h: HospitalDTO) => {
+    if (!h.coordinator) return;
+    const confirmed = await notify.confirm({
+      title: 'حذف حساب المنسق',
+      body: `سيتم حذف حساب المنسق "${h.coordinator.name}" لمستشفى ${h.name}. يمكن استعادته لاحقاً من سجل المحذوفات.`,
+      confirmText: 'حذف',
+      danger: true,
+    });
+    if (!confirmed) return;
+    run(() => deleteCoordinator(h.coordinator!.id));
+  };
+  const handleRestoreCoordinator = (c: TrashedCoordinatorDTO) => run(() => restoreCoordinator(c.id));
 
   const coordinatorActions: RowAction<HospitalDTO>[] = [
     {
@@ -390,6 +459,18 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
       onSelect: (h) => handleOpenAddCoordinator(h.id),
     },
     { label: 'تعديل بيانات المستشفى', icon: Edit2, onSelect: handleOpenEdit },
+    { label: 'حذف حساب المنسق', icon: Trash2, isAvailable: (h) => h.coordinator !== null, onSelect: handleDeleteCoordinator },
+  ];
+
+  const trashedCoordinatorActions: RowAction<TrashedCoordinatorDTO>[] = [
+    { label: 'استعادة المنسق', icon: ArchiveRestore, onSelect: handleRestoreCoordinator },
+  ];
+  const trashedCoordinatorColumns: ColumnDef<TrashedCoordinatorDTO>[] = [
+    { key: 'name', header: 'اسم المنسق', value: (c) => c.name },
+    { key: 'email', header: 'البريد الإلكتروني', value: (c) => c.email },
+    { key: 'hospitalName', header: 'المستشفى', value: (c) => c.hospitalName ?? 'غير مرتبط حالياً' },
+    { key: 'deletedByName', header: 'حذف بواسطة', value: (c) => c.deletedByName },
+    { key: 'deletedAt', header: 'تاريخ الحذف', type: 'date', value: (c) => c.deletedAt, render: (c) => <span className="whitespace-nowrap">{formatDate(c.deletedAt)}</span> },
   ];
 
   // The comprehensive profile shows four narrow tables for one hospital; the summary panels above them
@@ -561,9 +642,35 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
               </button>
             </div>
 
+            {activeSubTab === 'hospitals' && (
+              <button
+                onClick={() => setShowHospitalTrash((v) => !v)}
+                aria-pressed={showHospitalTrash}
+                className={`flex items-center gap-1.5 px-3 py-1.5 my-2 rounded-lg text-xs font-bold border transition-colors ${
+                  showHospitalTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+                }`}
+              >
+                {showHospitalTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>{showHospitalTrash ? 'عرض السجل النشط' : 'عرض المحذوفات'}</span>
+              </button>
+            )}
           </div>
 
-          {activeSubTab === 'hospitals' && (
+          {activeSubTab === 'hospitals' && showHospitalTrash && (
+            <DataTable
+              key="hospitals-trash"
+              rows={trashedHospitals}
+              columns={trashedHospitalColumns}
+              rowKey={(h) => h.id}
+              actions={trashedHospitalActions}
+              searchPlaceholder="بحث بالمستشفى المحذوف..."
+              emptyMessage="لا توجد سجلات محذوفة"
+              noMatchMessage="لا توجد سجلات مطابقة للبحث"
+              caption="سجل المستشفيات المحذوفة"
+            />
+          )}
+
+          {activeSubTab === 'hospitals' && !showHospitalTrash && (
             <DataTable
               key="hospitals"
               rows={hospitals}
@@ -595,6 +702,16 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                     {coordinatorsCount} منسق مسجل
                   </span>
                   <button
+                    onClick={() => setShowCoordinatorTrash((v) => !v)}
+                    aria-pressed={showCoordinatorTrash}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                      showCoordinatorTrash ? 'bg-danger-50 text-danger-800 border-danger-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
+                    }`}
+                  >
+                    {showCoordinatorTrash ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    <span>{showCoordinatorTrash ? 'عرض السجل النشط' : 'عرض المحذوفات'}</span>
+                  </button>
+                  <button
                     onClick={() => handleOpenAddCoordinator()}
                     disabled={hospitalsWithoutCoordinator.length === 0}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-800 hover:bg-navy-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50"
@@ -605,17 +722,31 @@ export function HospitalsView({ hospitals, visits, trainings, practitioners, equ
                 </div>
               </div>
 
-              <DataTable
-                key="coordinators"
-                rows={hospitals}
-                columns={coordinatorColumns}
-                rowKey={(h) => h.id}
-                actions={coordinatorActions}
-                searchPlaceholder="بحث بالمنسق، المستشفى، أو البريد..."
-                emptyMessage="لا توجد مستشفيات مسجلة بعد"
-                noMatchMessage="لا توجد مستشفيات مسجلة مطابقة"
-                caption="سجل حسابات منسقي مكافحة العدوى"
-              />
+              {showCoordinatorTrash ? (
+                <DataTable
+                  key="coordinators-trash"
+                  rows={trashedCoordinators}
+                  columns={trashedCoordinatorColumns}
+                  rowKey={(c) => c.id}
+                  actions={trashedCoordinatorActions}
+                  searchPlaceholder="بحث بالمنسق المحذوف..."
+                  emptyMessage="لا توجد سجلات محذوفة"
+                  noMatchMessage="لا توجد سجلات مطابقة للبحث"
+                  caption="سجل منسقي المستشفيات المحذوفين"
+                />
+              ) : (
+                <DataTable
+                  key="coordinators"
+                  rows={hospitals}
+                  columns={coordinatorColumns}
+                  rowKey={(h) => h.id}
+                  actions={coordinatorActions}
+                  searchPlaceholder="بحث بالمنسق، المستشفى، أو البريد..."
+                  emptyMessage="لا توجد مستشفيات مسجلة بعد"
+                  noMatchMessage="لا توجد مستشفيات مسجلة مطابقة"
+                  caption="سجل حسابات منسقي مكافحة العدوى"
+                />
+              )}
             </div>
           )}
         </>
